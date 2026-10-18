@@ -1,0 +1,6 @@
+{
+  "name": "IPO One",
+  "description": "Futuristic, privacy-first multi-Demat IPO application tracker, live GMP monitor, crucial T+3 date timeline, and official allotment hub.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

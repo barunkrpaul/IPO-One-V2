@@ -1,0 +1,56 @@
+name: Build & Publish IPO One APK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags: [ "v*" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-android-apk:
+    name: Build Signed Debug/Release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build Debug APK
+        run: gradle assembleDebug
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: IPO-One-Android-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Create GitHub Release (on tag or manual trigger)
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name == 'main' && 'v1.0.0' || github.ref_name }}
+          name: "IPO One Android App (${{ github.ref_name }})"
+          body: |
+            ### 🚀 IPO One — Multi-Demat IPO Tracker & Live GMP Terminal
+            Download and install **`app-debug.apk`** below on any Android device (Android 8.0+).
+            
+            #### Key Features:
+            - **Live GMP (Grey Market Premium)** with last-updated timestamp & Est. Listing Gain
+            - **Real-Time Category Subscription Multipliers** (`QIB`, `NII/HNI`, `Retail`, `Total`) & Issue Size (`₹ Cr`)
+            - **1-Click All Family Demats Batch Recorder** + Official Broker ASBA Deep-Links
+            - **100% On-Device Privacy** (Room SQLite + Android Keystore AES-256-GCM encryption)
+          files: app/build/outputs/apk/debug/app-debug.apk
+          draft: false
+          prerelease: false

@@ -1,0 +1,6 @@
+{
+  "summary": "Implementation plan for the Android-first IPO Application Management app inspired by Narada, featuring family member profiles, multi-Demat tracking, UPI ID validation, T+3 IPO timelines, allotment links, Room persistence, and SEBI/NPCI compliance architecture.",
+  "updatedAt": "2026-10-17T15:42:36.696388310Z",
+  "requestFeedback": true,
+  "userFacing": true
+}
