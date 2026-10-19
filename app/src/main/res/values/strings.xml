@@ -148,4 +148,29 @@
     <string name="listed_adjusted_info">Current price adjusted for %1$s.</string>
     <string name="listed_raw_price_info">Current price is not adjusted for splits or bonus issues, so the gain may be misleading after one.</string>
     <string name="listed_raw_price_cd">About the current price</string>
+
+    <!-- Intermediaries -->
+    <string name="menu_more">More options</string>
+    <string name="menu_intermediaries">Intermediaries</string>
+    <string name="intermediaries_screen_title">Intermediaries</string>
+    <string name="intermediaries_tab_lead_managers">Lead managers</string>
+    <string name="intermediaries_tab_registrars">Registrars</string>
+    <string name="intermediaries_tab_market_makers">Market makers</string>
+    <string name="intermediaries_coverage">Based on %1$d of %2$d IPOs with known intermediaries.</string>
+    <string name="intermediaries_fetch">Fetch details for %1$d more IPOs</string>
+    <string name="intermediaries_fetch_note">Reads each IPO\'s page once (about 50 KB each) and keeps it on this device.</string>
+    <string name="intermediaries_fetching">Fetching IPO details… %1$d of %2$d</string>
+    <string name="intermediaries_fetch_failed">%1$d could not be read. Try again later.</string>
+    <string name="intermediaries_cancel">Cancel</string>
+    <string name="intermediaries_loading">Loading IPO list…</string>
+    <string name="intermediaries_tab_empty">Nothing here yet. Fetch IPO details to build this list.</string>
+    <string name="intermediaries_counts">%1$d IPOs · %2$d Mainboard · %3$d SME</string>
+    <string name="intermediaries_avg_gain">Avg listing gain %1$s</string>
+    <string name="intermediaries_not_listed">Not listed yet</string>
+    <string name="intermediaries_check_allotment">Check allotment status</string>
+    <string name="intermediaries_website">Website</string>
+    <string name="intermediaries_role_lead_manager">Lead manager</string>
+    <string name="intermediaries_role_registrar">Registrar</string>
+    <string name="intermediaries_role_market_maker">Market maker</string>
+    <string name="intermediaries_not_found">%1$s is not in the directory yet. Fetch IPO details to include it.</string>
 </resources>

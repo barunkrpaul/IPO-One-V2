@@ -7,7 +7,14 @@ import com.example.data.model.IpoApplication
 import com.example.data.model.CalendarEvent
 import com.example.data.model.IpoBoardFilter
 import com.example.data.model.IpoExtras
+import com.example.data.local.IpoPageDetailsCache
+import com.example.data.model.IntermediaryDirectory
 import com.example.data.model.IpoLifecycleStage
+import com.example.data.model.IpoPageDetails
+import com.example.data.model.IpoRef
+import com.example.data.model.buildIntermediaryDirectory
+import com.example.data.model.listingLocalDate
+import com.example.data.model.mergedOver
 import com.example.data.model.ListedIpoRecord
 import com.example.data.model.ListingPerformance
 import com.example.data.model.listingPerformance
@@ -31,7 +38,13 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -61,21 +74,48 @@ enum class IpoSortOption(val label: String) {
     HIGHEST_SUB("Subscription (x)")
 }
 
+/** Progress of downloading IPO pages for the intermediary directory. */
+data class PageDetailsSyncState(
+    val isRunning: Boolean = false,
+    val done: Int = 0,
+    val total: Int = 0,
+    val failed: Int = 0
+)
+
 class IpoViewModel(
     private val repository: IpoFirestoreRepository,
     private val investorGainClient: InvestorGainClient,
-    private val currentUserId: String
+    private val currentUserId: String,
+    private val pageDetailsCache: IpoPageDetailsCache? = null
 ) : ViewModel() {
 
     private val _liveIposState = MutableStateFlow<UiState<List<LiveIpoItem>>>(UiState.Loading)
 
     // ipo_extras/{ipoId} overlay; an unreachable or empty collection simply leaves the feed as is
-    val ipoExtrasState: StateFlow<Map<String, IpoExtras>> = repository.observeIpoExtras()
+    private val firestoreExtras: StateFlow<Map<String, IpoExtras>> = repository.observeIpoExtras()
         .catch { e ->
             Log.w(TAG, "ipo_extras unavailable, using InvestorGain data only", e)
             emit(emptyMap())
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+    /** Details read from each IPO's InvestorGain page, keyed by IPO id. */
+    private val _pageDetails = MutableStateFlow<Map<String, IpoPageDetails>>(emptyMap())
+    private val pageFetchMutex = Mutex()
+    private var bulkSyncJob: Job? = null
+
+    private val _pageDetailsSync = MutableStateFlow(PageDetailsSyncState())
+    val pageDetailsSync: StateFlow<PageDetailsSyncState> = _pageDetailsSync.asStateFlow()
+
+    /** Page details overlaid with ipo_extras; hand-maintained Firestore values win. */
+    val ipoExtrasState: StateFlow<Map<String, IpoExtras>> = combine(
+        firestoreExtras,
+        _pageDetails
+    ) { firestore, pages ->
+        (firestore.keys + pages.keys).associateWith { id ->
+            (firestore[id] ?: IpoExtras()).mergedOver(pages[id]?.toExtras())
+        }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
     private val _listedHistory = MutableStateFlow<UiState<List<ListedIpoRecord>>>(UiState.Loading)
 
@@ -303,8 +343,117 @@ class IpoViewModel(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), ListedHistoryView())
 
+    /** Lead manager, registrar and market maker directories across all known IPOs. */
+    val intermediaryDirectoryState: StateFlow<IntermediaryDirectory> = combine(
+        liveIposState,
+        listedHistoryState,
+        ipoExtrasState
+    ) { live, history, extras ->
+        buildIntermediaryDirectory(ipoRefs(live, history), extras)
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000L),
+        IntermediaryDirectory(emptyMap(), 0, 0)
+    )
+
     init {
+        viewModelScope.launch {
+            pageDetailsCache?.load()?.let { cached ->
+                _pageDetails.value = cached + _pageDetails.value
+            }
+        }
         refreshLiveInvestorGainData()
+    }
+
+    private fun ipoRefs(
+        live: UiState<List<LiveIpoItem>>,
+        history: UiState<List<ListedIpoRecord>>
+    ): List<IpoRef> {
+        val historyRefs = (history as? UiState.Success)?.data.orEmpty().map {
+            IpoRef(it.id, it.name, it.category, it.listingGainPct, it.listingDate, it.url)
+        }
+        val today = LocalDate.now()
+        val liveRefs = (live as? UiState.Success)?.data.orEmpty().map { item ->
+            val gain = item.listingPrice?.takeIf { item.issuePrice > 0 }
+                ?.let { (it - item.issuePrice) / item.issuePrice * 100.0 }
+            IpoRef(item.id, item.name, item.category, gain, item.listingLocalDate(today), item.investorGainUrl)
+        }
+        // History rows carry the authoritative listing gain, so they go first
+        return (historyRefs + liveRefs).distinctBy { it.id }
+    }
+
+    private suspend fun fetchPageDetails(id: String, url: String): Boolean {
+        if (url.isBlank()) return false
+        val result = pageFetchMutex.withLock { investorGainClient.fetchIpoPageDetails(url) }
+        return result.fold(
+            onSuccess = { details ->
+                _pageDetails.value = _pageDetails.value + (id to details)
+                true
+            },
+            onFailure = { err ->
+                Log.w(TAG, "Could not read IPO page $url", err)
+                false
+            }
+        )
+    }
+
+    private fun persistPageDetails() {
+        val cache = pageDetailsCache ?: return
+        viewModelScope.launch { cache.save(_pageDetails.value) }
+    }
+
+    /**
+     * Reads the IPO page if it is not cached yet, or again when [refresh] is set
+     * (open IPOs, whose subscription changes during the day).
+     */
+    fun ensurePageDetails(ipo: LiveIpoItem, refresh: Boolean = false) {
+        if (!refresh && _pageDetails.value.containsKey(ipo.id)) return
+        viewModelScope.launch {
+            if (fetchPageDetails(ipo.id, ipo.investorGainUrl)) persistPageDetails()
+        }
+    }
+
+    /** After each feed refresh: read pages of new IPOs and re-read open ones. */
+    private fun refreshLivePageDetails(items: List<LiveIpoItem>) {
+        viewModelScope.launch {
+            val today = LocalDate.now()
+            val targets = items.filter {
+                !_pageDetails.value.containsKey(it.id) || it.lifecycleStage(today) == IpoLifecycleStage.OPEN
+            }
+            var changed = false
+            for (item in targets) {
+                if (fetchPageDetails(item.id, item.investorGainUrl)) changed = true
+                delay(PAGE_FETCH_GAP_MS)
+            }
+            if (changed) persistPageDetails()
+        }
+    }
+
+    /** Downloads the pages of every known IPO that has no details yet. */
+    fun syncAllPageDetails() {
+        if (bulkSyncJob?.isActive == true) return
+        bulkSyncJob = viewModelScope.launch {
+            val missing = ipoRefs(liveIposState.value, listedHistoryState.value)
+                .filter { it.url.isNotBlank() && !_pageDetails.value.containsKey(it.id) }
+            _pageDetailsSync.value = PageDetailsSyncState(isRunning = true, total = missing.size)
+            var failed = 0
+            try {
+                missing.forEachIndexed { index, ref ->
+                    if (!fetchPageDetails(ref.id, ref.url)) failed++
+                    _pageDetailsSync.value = PageDetailsSyncState(true, index + 1, missing.size, failed)
+                    // Save as we go so an interrupted sync keeps its progress
+                    if ((index + 1) % 10 == 0) pageDetailsCache?.save(_pageDetails.value)
+                    delay(PAGE_FETCH_GAP_MS)
+                }
+            } finally {
+                withContext(NonCancellable) { pageDetailsCache?.save(_pageDetails.value) }
+                _pageDetailsSync.value = _pageDetailsSync.value.copy(isRunning = false)
+            }
+        }
+    }
+
+    fun cancelPageDetailsSync() {
+        bulkSyncJob?.cancel()
     }
 
     fun setListedYearFilter(year: Int?) {
@@ -343,6 +492,7 @@ class IpoViewModel(
                 onSuccess = { list ->
                     _liveIposState.value = UiState.Success(list)
                     _lastLiveRefreshMillis.value = System.currentTimeMillis()
+                    refreshLivePageDetails(list)
                 },
                 onFailure = { err ->
                     Log.e(TAG, "Failed to fetch live InvestorGain IPOs", err)
@@ -797,5 +947,6 @@ class IpoViewModel(
     companion object {
         private const val TAG = "IpoViewModel"
         private const val LISTED_PAGE_SIZE = 20
+        private const val PAGE_FETCH_GAP_MS = 300L
     }
 }

@@ -44,6 +44,7 @@ data class IpoExtras(
     val anchorLockIn100Date: LocalDate? = null,
     val leadManagers: List<String> = emptyList(),
     val registrar: String? = null,
+    val registrarWebsite: String? = null,
     val marketMaker: String? = null,
     val subscription: Map<SubscriptionCategory, SubscriptionFigures> = emptyMap(),
     val subscriptionUpdatedAtMillis: Long? = null,
@@ -69,6 +70,7 @@ data class IpoExtras(
                 leadManagers = (data["leadManagers"] as? List<*>).orEmpty()
                     .mapNotNull { it.asText() },
                 registrar = data["registrar"].asText(),
+                registrarWebsite = data["registrarWebsite"].asText(),
                 marketMaker = data["marketMaker"].asText(),
                 subscription = SubscriptionCategory.entries.mapNotNull { category ->
                     val row = subscriptionMap[category.key] as? Map<*, *> ?: return@mapNotNull null

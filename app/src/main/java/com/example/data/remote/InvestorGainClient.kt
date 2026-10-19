@@ -1,6 +1,9 @@
 package com.example.data.remote
 
 import com.example.data.model.IpoDates
+import com.example.data.model.IpoPageDetails
+import com.example.data.model.IpoPageParser
+import com.example.data.model.NamedIntermediary
 import com.example.data.model.ListedIpoRecord
 import com.example.data.model.LiveIpoItem
 import com.example.data.model.parseListingPriceFromNameCell
@@ -11,6 +14,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
@@ -252,6 +256,70 @@ class InvestorGainClient(
                 )
             }
             records
+        }
+    }
+
+    /**
+     * Intermediaries, extra dates, symbol, logo and subscription breakdown
+     * embedded in an IPO's InvestorGain page.
+     */
+    suspend fun fetchIpoPageDetails(pageUrl: String): Result<IpoPageDetails> = withContext(Dispatchers.IO) {
+        runCatching {
+            val req = Request.Builder()
+                .url(pageUrl)
+                .header("User-Agent", USER_AGENT)
+                .header("Accept", "text/html")
+                .build()
+            val html = httpClient.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) throw java.io.IOException("HTTP ${resp.code} for $pageUrl")
+                resp.body?.string().orEmpty()
+            }
+            val text = IpoPageParser.unescape(html)
+
+            val leadManagers = IpoPageParser.extractJsonArray(text, "ipoLeadManagersList")
+                ?.let { runCatching { JSONArray(it) }.getOrNull() }
+                ?.let { arr ->
+                    (0 until arr.length()).mapNotNull { i ->
+                        val obj = arr.optJSONObject(i) ?: return@mapNotNull null
+                        val name = decodeHtmlEntities(obj.optString("comp_name", "")).trim()
+                        if (name.isEmpty()) null else NamedIntermediary(obj.opt("id")?.toString().orEmpty(), name)
+                    }
+                }
+                .orEmpty()
+
+            val registrarObj = IpoPageParser.extractJsonArray(text, "registrarInfo")
+                ?.let { runCatching { JSONArray(it).optJSONObject(0) }.getOrNull() }
+            val registrar = registrarObj?.let { obj ->
+                val name = decodeHtmlEntities(obj.optString("registrar_name", "")).trim()
+                if (name.isEmpty()) null else NamedIntermediary(obj.opt("id")?.toString().orEmpty(), name)
+            }
+
+            val capPrice = IpoPageParser.extractValue(text, "cap_price")?.toDoubleOrNull()
+            val latestBidding = IpoPageParser.extractJsonArray(text, "ipoBiddingData")
+                ?.let { runCatching { JSONArray(it) }.getOrNull() }
+                ?.let { arr -> if (arr.length() > 0) arr.optJSONObject(arr.length() - 1) else null }
+            val biddingValues = latestBidding?.let { obj ->
+                obj.keys().asSequence().associateWith { key -> obj.opt(key)?.toString().orEmpty() }
+            }.orEmpty()
+
+            val logoFile = IpoPageParser.extractValue(text, "logo_url")
+            IpoPageDetails(
+                leadManagers = leadManagers,
+                registrar = registrar,
+                registrarWebsite = IpoPageParser.firstLink(registrarObj?.optString("registrar_basic_info")),
+                marketMaker = IpoPageParser.extractMarketMaker(text),
+                symbol = IpoPageParser.extractValue(text, "nse_symbol")
+                    ?: IpoPageParser.extractValue(text, "bse_scripcode"),
+                logoUrl = logoFile?.let { if (it.startsWith("http")) it else "https://www.chittorgarh.net/images/ipo/$it" },
+                floorPrice = IpoPageParser.extractValue(text, "floor_price")?.toDoubleOrNull(),
+                settlementDate = IpoPageParser.extractIsoDate(text, "timetable_share_credit_dt"),
+                anchorLockIn50Date = IpoPageParser.extractIsoDate(text, "timetable_anchor_lockin_end_dt_1"),
+                anchorLockIn100Date = IpoPageParser.extractIsoDate(text, "timetable_anchor_lockin_end_dt_2"),
+                subscription = IpoPageParser.subscriptionFromBidding(biddingValues, capPrice),
+                subscriptionUpdatedAtMillis = biddingValues["create_date"]
+                    ?.let { runCatching { java.time.Instant.parse(it).toEpochMilli() }.getOrNull() },
+                fetchedAtMillis = System.currentTimeMillis()
+            )
         }
     }
 

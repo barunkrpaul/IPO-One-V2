@@ -24,6 +24,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Security
@@ -89,6 +92,11 @@ import com.example.ui.components.RegistrarVerificationModalSheet
 import com.example.ui.components.detectRegistrarForIpo
 import com.example.ui.screens.AllotmentAndVaultScreen
 import com.example.data.model.eventsOn
+import com.example.data.local.IpoPageDetailsCache
+import com.example.data.model.IntermediaryRole
+import com.example.data.model.IpoLifecycleStage
+import com.example.data.model.lifecycleStage
+import com.example.ui.screens.IntermediariesScreen
 import com.example.ui.screens.IpoCalendarScreen
 import com.example.ui.screens.IpoDetailScreen
 import com.example.ui.screens.MainDashboardScreen
@@ -181,7 +189,8 @@ fun MainAppContent(
                 IpoViewModel(
                     repository = IpoFirestoreRepository(db),
                     investorGainClient = InvestorGainClient(),
-                    currentUserId = userId
+                    currentUserId = userId,
+                    pageDetailsCache = IpoPageDetailsCache(app)
                 )
             }
         }
@@ -204,6 +213,8 @@ fun MainAppContent(
     val lastLiveRefreshMillis by viewModel.lastLiveRefreshMillis.collectAsStateWithLifecycle()
     val calendarEvents by viewModel.calendarEventsState.collectAsStateWithLifecycle()
     val listedHistory by viewModel.listedHistoryView.collectAsStateWithLifecycle()
+    val intermediaryDirectory by viewModel.intermediaryDirectoryState.collectAsStateWithLifecycle()
+    val pageDetailsSync by viewModel.pageDetailsSync.collectAsStateWithLifecycle()
     val todayEvents = remember(calendarEvents) { eventsOn(calendarEvents, java.time.LocalDate.now()) }
 
     val userProfile = (userProfileState as? UiState.Success)?.data
@@ -217,6 +228,9 @@ fun MainAppContent(
     var selectedIpo by remember { mutableStateOf<LiveIpoItem?>(null) }
     // Tab indices: 0 dashboard, 1 allotment & vault, 2 security, 3 calendar
     var calendarFocusDate by remember { mutableStateOf<java.time.LocalDate?>(null) }
+    var showIntermediaries by rememberSaveable { mutableStateOf(false) }
+    var intermediaryFocus by remember { mutableStateOf<Pair<IntermediaryRole, String>?>(null) }
+    var overflowMenuOpen by remember { mutableStateOf(false) }
     val openIpoById: (String) -> Unit = { id ->
         (allIposState as? UiState.Success)?.data?.firstOrNull { it.id == id }?.let { selectedIpo = it }
     }
@@ -280,6 +294,13 @@ fun MainAppContent(
         (allIposState as? UiState.Success)?.data?.firstOrNull { it.id == selected.id } ?: selected
     }
 
+    LaunchedEffect(detailIpo?.id) {
+        detailIpo?.let { ipo ->
+            // Open IPOs are re-read so the subscription breakdown is current
+            viewModel.ensurePageDetails(ipo, refresh = ipo.lifecycleStage() == IpoLifecycleStage.OPEN)
+        }
+    }
+
     if (detailIpo != null) {
         IpoDetailScreen(
             ipo = detailIpo,
@@ -332,7 +353,37 @@ fun MainAppContent(
             onTimelineDateClick = { date ->
                 calendarFocusDate = date
                 currentTab = 3
+                showIntermediaries = false
                 selectedIpo = null
+            },
+            onIntermediaryClick = { role, name ->
+                intermediaryFocus = role to name
+                showIntermediaries = true
+                selectedIpo = null
+            }
+        )
+    } else if (showIntermediaries) {
+        IntermediariesScreen(
+            directory = intermediaryDirectory,
+            sync = pageDetailsSync,
+            focus = intermediaryFocus,
+            onBack = {
+                showIntermediaries = false
+                intermediaryFocus = null
+            },
+            onSyncAll = viewModel::syncAllPageDetails,
+            onCancelSync = viewModel::cancelPageDetailsSync,
+            onOpenIpo = { ref ->
+                val live = (allIposState as? UiState.Success)?.data?.firstOrNull { it.id == ref.id }
+                if (live != null) {
+                    selectedIpo = live
+                } else if (ref.url.isNotBlank()) {
+                    runCatching {
+                        context.startActivity(
+                            android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(ref.url))
+                        )
+                    }
+                }
             }
         )
     } else Scaffold(
@@ -350,6 +401,30 @@ fun MainAppContent(
                     }
                 },
                 actions = {
+                    Box {
+                        IconButton(
+                            onClick = { overflowMenuOpen = true },
+                            modifier = Modifier
+                                .size(36.dp)
+                                .testTag("top_overflow_menu")
+                        ) {
+                            Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.menu_more))
+                        }
+                        DropdownMenu(
+                            expanded = overflowMenuOpen,
+                            onDismissRequest = { overflowMenuOpen = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.menu_intermediaries)) },
+                                onClick = {
+                                    overflowMenuOpen = false
+                                    intermediaryFocus = null
+                                    showIntermediaries = true
+                                },
+                                modifier = Modifier.testTag("menu_intermediaries")
+                            )
+                        }
+                    }
                     if (panList.isNotEmpty()) {
                         IconButton(
                             onClick = { viewModel.toggleHidePanNumbers() },
