@@ -10,17 +10,18 @@ jobs:
         run: |
           UA="Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/129 Mobile Safari/537.36"
           get() { curl -sS -A "$UA" -H "Referer: https://www.investorgain.com/" -H "Accept: application/json" "$1"; }
-          for pg in 1 2 10; do get "https://webnodejs.investorgain.com/cloud/v2/report/data-read/331/$pg/10/2026/2026-27/0/all?search=" > p$pg.json; done
-          get "https://webnodejs.investorgain.com/cloud/v2/report/data-read/331/1/10/2026/2025-26/0/all?search=" > fy.json
+          for id in $(seq 320 345) 300 301 302 310 311 312 350 351 352 360 361 362 370 371 372 380; do get "https://webnodejs.investorgain.com/cloud/v2/report/data-read/$id/1/10/2026/2025-26/0/all?search=" > r$id.json; done
           python3 - <<'PY'
-          import json,re
-          def note(t): print("::notice::"+t.replace("\n"," ")[:3800])
-          for f in ["p1.json","p2.json","p10.json","fy.json"]:
+          import json,glob,re
+          out=[]
+          for f in sorted(glob.glob("r*.json")):
               try:
-                  d=json.load(open(f)); rows=d.get("reportTableData",[])
-              except Exception as e:
-                  note(f+" err "+open(f).read()[:200]); continue
-              meta={k:d.get(k) for k in ["totalRecords","totalPages","iPageNo","fldpage_size","sSearchWhere"]}
-              summ=[(r.get("~ipo_name"),r.get("~ipo_status1"),r.get("~Str_Listing"),re.findall(r"L@[^<]*",r.get("Name",""))) for r in rows]
-              note(f+" "+json.dumps(meta)+" first="+json.dumps(summ[:4],ensure_ascii=False)+" last="+json.dumps(summ[-3:],ensure_ascii=False))
+                  d=json.load(open(f)); rows=d.get("reportTableData") or []
+              except Exception:
+                  continue
+              if not rows: continue
+              keys=[k for k in rows[0].keys() if not k.startswith("~")][:12]
+              out.append("%s n=%s tot=%s keys=%s"%(f,len(rows),d.get("totalRecords"),keys))
+          for k in range(0,len(out),3):
+              print("::notice::"+" || ".join(out[k:k+3])[:3800])
           PY
