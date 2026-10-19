@@ -47,9 +47,9 @@ jobs:
           if [ -n "$RELEASE_KEYSTORE_B64" ]; then
             echo "$RELEASE_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
             echo "RELEASE_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
-            echo "Release key found; signing the release APK with it."
+            echo "::notice::Release key found; signing the release APK with it."
           else
-            echo "No RELEASE_KEYSTORE_B64 secret; the release APK uses the debug key."
+            echo "::warning::No RELEASE_KEYSTORE_B64 secret; the release APK uses the debug key."
           fi
 
       - name: Build Signed APKs
