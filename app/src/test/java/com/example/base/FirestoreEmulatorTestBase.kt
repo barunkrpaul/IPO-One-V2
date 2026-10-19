@@ -39,7 +39,7 @@ abstract class FirestoreEmulatorTestBase {
             val newApp = FirebaseApp.initializeApp(
                 context,
                 FirebaseOptions.Builder()
-                    .setApplicationId("com.aistudio.naradaipo.trkqz")
+                    .setApplicationId("com.aistudio.ipoone.invest")
                     .setProjectId(PROJECT_ID)
                     .setApiKey("fake-api-key-for-emulator")
                     .build()
@@ -66,8 +66,6 @@ abstract class FirestoreEmulatorTestBase {
         auth.signOut()
     }
 
-    // Local unit test helper ONLY (under app/src/test/). In application code (app/src/main/),
-    // user login MUST use Google Sign-In with Credential Manager, NEVER signInWithEmailAndPassword.
     protected suspend fun signInTestUser(email: String): String = withContext(Dispatchers.IO) {
         withTimeout(AUTH_TIMEOUT_MS) {
             val result = try {

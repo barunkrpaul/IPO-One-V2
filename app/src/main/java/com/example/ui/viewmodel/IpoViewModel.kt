@@ -1,228 +1,346 @@
 package com.example.ui.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.data.local.entity.IpoEntity
-import com.example.data.repository.IpoRepository
-import com.example.model.IpoSeries
-import com.example.model.IpoStatus
+import com.example.data.model.IpoApplication
+import com.example.data.model.IpoBoardFilter
+import com.example.data.model.IpoStatusFilter
+import com.example.data.model.LiveIpoItem
+import com.example.data.model.PanProfile
+import com.example.data.model.UserProfile
+import com.example.data.model.WatchlistItem
+import com.example.data.remote.InvestorGainClient
+import com.example.data.repository.IpoFirestoreRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlin.math.round
 
-data class IpoFilterState(
-    val searchQuery: String = "",
-    val selectedSeries: String = "ALL", // ALL, Mainboard, SME
-    val selectedStatus: String = "ALL" // ALL, Open Now, Upcoming, Closed / Awaiting Allotment
-)
+sealed interface UiState<out T> {
+    data object Loading : UiState<Nothing>
+    data class Success<T>(val data: T) : UiState<T>
+    data class Error(val message: String) : UiState<Nothing>
+}
 
-class IpoViewModel(private val ipoRepository: IpoRepository) : ViewModel() {
+enum class IpoSortOption(val label: String) {
+    DEFAULT("InvestorGain Order"),
+    HIGHEST_GMP_PCT("Highest GMP %"),
+    HIGHEST_PROFIT("Est. Profit / Lot"),
+    HIGHEST_SUB("Subscription (x)")
+}
 
-    private val _filterState = MutableStateFlow(IpoFilterState())
-    val filterState: StateFlow<IpoFilterState> = _filterState
+class IpoViewModel(
+    private val repository: IpoFirestoreRepository,
+    private val investorGainClient: InvestorGainClient,
+    private val currentUserId: String
+) : ViewModel() {
 
-    private val _selectedIpo = MutableStateFlow<IpoEntity?>(null)
-    val selectedIpo: StateFlow<IpoEntity?> = _selectedIpo
+    private val _liveIposState = MutableStateFlow<UiState<List<LiveIpoItem>>>(UiState.Loading)
+    val liveIposState: StateFlow<UiState<List<LiveIpoItem>>> = _liveIposState.asStateFlow()
 
-    private val _gmpSyncMessage = MutableStateFlow<String?>(null)
-    val gmpSyncMessage: StateFlow<String?> = _gmpSyncMessage
+    private val _statusFilter = MutableStateFlow(IpoStatusFilter.ALL)
+    val statusFilter: StateFlow<IpoStatusFilter> = _statusFilter.asStateFlow()
 
-    val allIpos: StateFlow<List<IpoEntity>> = ipoRepository.allIpos
+    private val _boardFilter = MutableStateFlow(IpoBoardFilter.ALL)
+    val boardFilter: StateFlow<IpoBoardFilter> = _boardFilter.asStateFlow()
+
+    private val _sortOption = MutableStateFlow(IpoSortOption.DEFAULT)
+    val sortOption: StateFlow<IpoSortOption> = _sortOption.asStateFlow()
+
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    private val _onlyWatchlist = MutableStateFlow(false)
+    val onlyWatchlist: StateFlow<Boolean> = _onlyWatchlist.asStateFlow()
+
+    private val _statusBanner = MutableStateFlow<String?>(null)
+    val statusBanner: StateFlow<String?> = _statusBanner.asStateFlow()
+
+    val userProfileState: StateFlow<UiState<UserProfile?>> = repository.observeUserProfile(currentUserId)
+        .map<UserProfile?, UiState<UserProfile?>> { UiState.Success(it) }
+        .catch { e ->
+            Log.w(TAG, "Error observing user profile", e)
+            emit(UiState.Error(e.message ?: "Failed to load profile"))
+        }
         .stateIn(
             scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
+            started = SharingStarted.WhileSubscribed(5000L),
+            initialValue = UiState.Loading
         )
 
-    val filteredIpos: StateFlow<List<IpoEntity>> = combine(
-        ipoRepository.allIpos,
-        _filterState
-    ) { ipos, filter ->
-        ipos.filter { ipo ->
-            val matchesQuery = filter.searchQuery.isBlank() ||
-                    ipo.companyName.contains(filter.searchQuery, ignoreCase = true) ||
-                    ipo.symbol.contains(filter.searchQuery, ignoreCase = true)
+    val panProfilesState: StateFlow<UiState<List<PanProfile>>> = repository.observePanProfiles(currentUserId)
+        .map<List<PanProfile>, UiState<List<PanProfile>>> { UiState.Success(it) }
+        .catch { e ->
+            Log.w(TAG, "Error observing PAN profiles", e)
+            emit(UiState.Error(e.message ?: "Failed to load PAN Vault"))
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000L),
+            initialValue = UiState.Loading
+        )
 
-            val matchesSeries = when (filter.selectedSeries) {
-                "ALL" -> true
-                IpoSeries.MAINBOARD.displayName -> ipo.series == IpoSeries.MAINBOARD.displayName
-                IpoSeries.SME.displayName -> ipo.series == IpoSeries.SME.displayName
-                else -> true
+    val applicationsState: StateFlow<UiState<List<IpoApplication>>> = repository.observeApplications(currentUserId)
+        .map<List<IpoApplication>, UiState<List<IpoApplication>>> { UiState.Success(it) }
+        .catch { e ->
+            Log.w(TAG, "Error observing applications", e)
+            emit(UiState.Error(e.message ?: "Failed to load IPO applications"))
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000L),
+            initialValue = UiState.Loading
+        )
+
+    val watchlistState: StateFlow<UiState<List<WatchlistItem>>> = repository.observeWatchlist(currentUserId)
+        .map<List<WatchlistItem>, UiState<List<WatchlistItem>>> { UiState.Success(it) }
+        .catch { e ->
+            Log.w(TAG, "Error observing watchlist", e)
+            emit(UiState.Error(e.message ?: "Failed to load watchlist"))
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000L),
+            initialValue = UiState.Loading
+        )
+
+    val filteredIposState: StateFlow<UiState<List<LiveIpoItem>>> = combine(
+        _liveIposState,
+        _statusFilter,
+        _boardFilter,
+        _sortOption,
+        combine(_searchQuery, _onlyWatchlist, watchlistState) { q, onlyWatch, wState ->
+            val watchedIds = (wState as? UiState.Success)?.data?.map { it.ipoId }?.toSet() ?: emptySet()
+            Triple(q, onlyWatch, watchedIds)
+        }
+    ) { liveState, status, board, sort, (query, onlyWatch, watchedIds) ->
+        when (liveState) {
+            is UiState.Loading -> UiState.Loading
+            is UiState.Error -> liveState
+            is UiState.Success -> {
+                val filtered = liveState.data.filter { item ->
+                    val matchesStatus = when (status) {
+                        IpoStatusFilter.ALL -> true
+                        IpoStatusFilter.OPEN -> item.statusCode == "O" || item.statusCode == "CT"
+                        IpoStatusFilter.UPCOMING -> item.statusCode == "U"
+                        IpoStatusFilter.CLOSED -> item.statusCode == "C"
+                        IpoStatusFilter.LISTED -> item.statusCode.startsWith("L")
+                    }
+                    val matchesBoard = when (board) {
+                        IpoBoardFilter.ALL -> true
+                        IpoBoardFilter.MAINBOARD -> item.category.equals("Mainboard", ignoreCase = true)
+                        IpoBoardFilter.SME -> item.category.equals("SME", ignoreCase = true)
+                    }
+                    val matchesSearch = query.isBlank() ||
+                        item.name.contains(query, ignoreCase = true) ||
+                        item.sector.contains(query, ignoreCase = true)
+                    val matchesWatch = !onlyWatch || watchedIds.contains(item.id)
+                    matchesStatus && matchesBoard && matchesSearch && matchesWatch
+                }
+
+                val sorted = when (sort) {
+                    IpoSortOption.DEFAULT -> filtered
+                    IpoSortOption.HIGHEST_GMP_PCT -> filtered.sortedByDescending { it.gmpPercent }
+                    IpoSortOption.HIGHEST_PROFIT -> filtered.sortedByDescending { it.estProfitPerLotInr }
+                    IpoSortOption.HIGHEST_SUB -> filtered.sortedByDescending {
+                        it.totalSubscription.replace("x", "", ignoreCase = true).toDoubleOrNull() ?: 0.0
+                    }
+                }
+                UiState.Success(sorted)
             }
-
-            val matchesStatus = when (filter.selectedStatus) {
-                "ALL" -> true
-                IpoStatus.OPEN.displayName -> ipo.status == IpoStatus.OPEN.displayName
-                IpoStatus.UPCOMING.displayName -> ipo.status == IpoStatus.UPCOMING.displayName
-                "CLOSED" -> ipo.status == IpoStatus.CLOSED.displayName ||
-                        ipo.status == IpoStatus.ALLOTTED.displayName ||
-                        ipo.status == IpoStatus.LISTED.displayName
-                else -> true
-            }
-
-            matchesQuery && matchesSeries && matchesStatus
         }
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = emptyList()
+        started = SharingStarted.WhileSubscribed(5000L),
+        initialValue = UiState.Loading
     )
 
+    init {
+        refreshLiveInvestorGainData()
+    }
+
+    fun refreshLiveInvestorGainData() {
+        viewModelScope.launch {
+            _liveIposState.value = UiState.Loading
+            val result = investorGainClient.fetchLiveIpos()
+            result.fold(
+                onSuccess = { list ->
+                    _liveIposState.value = UiState.Success(list)
+                },
+                onFailure = { err ->
+                    Log.e(TAG, "Failed to fetch live InvestorGain IPOs", err)
+                    _liveIposState.value = UiState.Error(
+                        err.localizedMessage ?: "Failed to load live IPO data from InvestorGain.com"
+                    )
+                }
+            )
+        }
+    }
+
+    fun setStatusFilter(filter: IpoStatusFilter) {
+        _statusFilter.value = filter
+    }
+
+    fun setBoardFilter(filter: IpoBoardFilter) {
+        _boardFilter.value = filter
+    }
+
+    fun setSortOption(option: IpoSortOption) {
+        _sortOption.value = option
+    }
+
     fun setSearchQuery(query: String) {
-        _filterState.value = _filterState.value.copy(searchQuery = query)
+        _searchQuery.value = query
     }
 
-    fun setSelectedSeries(series: String) {
-        _filterState.value = _filterState.value.copy(selectedSeries = series)
+    fun toggleOnlyWatchlist() {
+        _onlyWatchlist.value = !_onlyWatchlist.value
     }
 
-    fun setSelectedStatus(status: String) {
-        _filterState.value = _filterState.value.copy(selectedStatus = status)
+    fun clearBanner() {
+        _statusBanner.value = null
     }
 
-    fun selectIpo(ipo: IpoEntity?) {
-        _selectedIpo.value = ipo
-    }
-
-    fun toggleFavorite(ipo: IpoEntity) {
-        viewModelScope.launch {
-            ipoRepository.updateIpo(ipo.copy(isFavorite = !ipo.isFavorite))
-        }
-    }
-
-    fun updateGmp(ipo: IpoEntity, newGmpInr: Double) {
-        viewModelScope.launch {
-            val pct = if (ipo.maxPrice > 0) {
-                round((newGmpInr / ipo.maxPrice) * 1000.0) / 10.0
-            } else 0.0
-            val updated = ipo.copy(
-                gmpInr = newGmpInr,
-                gmpPercent = pct,
-                updatedAt = System.currentTimeMillis()
-            )
-            ipoRepository.updateIpo(updated)
-            if (_selectedIpo.value?.id == ipo.id) {
-                _selectedIpo.value = updated
-            }
-            _gmpSyncMessage.value = "GMP updated for ${ipo.symbol}: +₹${newGmpInr.toInt()} (${pct}%)"
-        }
-    }
-
-    fun updateSubscriptionRates(
-        ipo: IpoEntity,
-        qibSub: Double,
-        niiSub: Double,
-        retailSub: Double,
-        totalSub: Double
+    fun ensureUserProfileInitialized(
+        displayName: String,
+        email: String?,
+        phoneNumber: String?,
+        authProvider: String
     ) {
         viewModelScope.launch {
-            val updated = ipo.copy(
-                qibSub = qibSub,
-                niiSub = niiSub,
-                retailSub = retailSub,
-                totalSub = totalSub,
-                updatedAt = System.currentTimeMillis()
+            val currentProfile = (userProfileState.value as? UiState.Success)?.data
+            val biometricEnabled = currentProfile?.biometricEnabled ?: false
+            val finalPhone = phoneNumber ?: currentProfile?.phoneNumber
+            val finalName = displayName.ifBlank { currentProfile?.displayName ?: "IPO Investor" }
+            repository.saveUserProfile(
+                displayName = finalName,
+                email = email ?: currentProfile?.email,
+                phoneNumber = finalPhone,
+                authProvider = authProvider,
+                biometricEnabled = biometricEnabled
             )
-            ipoRepository.updateIpo(updated)
-            if (_selectedIpo.value?.id == ipo.id) {
-                _selectedIpo.value = updated
-            }
-            _gmpSyncMessage.value = "Subscription updated for ${ipo.symbol}: Total ${totalSub}x (QIB ${qibSub}x, NII ${niiSub}x, Retail ${retailSub}x)"
         }
     }
 
-    fun refreshAllLiveGmpTimestamps() {
+    fun updateBiometricLock(enabled: Boolean) {
         viewModelScope.launch {
-            val now = System.currentTimeMillis()
-            val list = ipoRepository.allIpos.first()
-            list.forEach { ipo ->
-                ipoRepository.updateIpo(ipo.copy(updatedAt = now))
+            val res = repository.updateBiometricPreference(enabled)
+            if (res.isSuccess) {
+                _statusBanner.value = if (enabled) {
+                    "Biometric App Lock enabled for your financial vault"
+                } else {
+                    "Biometric App Lock disabled"
+                }
+            } else {
+                _statusBanner.value = "Failed to update biometric setting"
             }
-            _gmpSyncMessage.value = "Live GMP & Subscription timestamps synced across ${list.size} IPOs"
         }
     }
 
-    fun deployLiveIpoFeed() {
+    fun updateMobilePhone(phoneNumber: String, displayName: String, email: String?) {
         viewModelScope.launch {
-            val count = ipoRepository.deployLiveIpoData()
-            _gmpSyncMessage.value = "Successfully deployed $count live IPOs (Open Now & Upcoming with real-time GMP)"
+            val currentProfile = (userProfileState.value as? UiState.Success)?.data
+            val res = repository.saveUserProfile(
+                displayName = displayName.ifBlank { currentProfile?.displayName ?: "IPO Investor" },
+                email = email ?: currentProfile?.email,
+                phoneNumber = phoneNumber,
+                authProvider = "Mobile+Google",
+                biometricEnabled = currentProfile?.biometricEnabled ?: false,
+                priceAlertsEnabled = currentProfile?.priceAlertsEnabled ?: true
+            )
+            if (res.isSuccess) {
+                _statusBanner.value = "Mobile number $phoneNumber linked to your IPO One profile!"
+            }
         }
     }
 
-    fun clearGmpSyncMessage() {
-        _gmpSyncMessage.value = null
-    }
-
-    fun addCustomIpo(
-        companyName: String,
-        symbol: String,
-        series: String,
-        minPrice: Double,
-        maxPrice: Double,
-        lotSize: Int,
-        issueSizeCr: Double,
-        openDate: String,
-        closeDate: String,
-        allotmentDate: String,
-        refundDate: String,
-        listingDate: String,
-        registrarName: String,
-        status: String,
-        gmpInr: Double,
-        qibSub: Double = 0.0,
-        niiSub: Double = 0.0,
-        retailSub: Double = 0.0,
-        totalSub: Double = 0.0
+    fun addPanProfile(
+        holderName: String,
+        panNumber: String,
+        dematId: String,
+        upiId: String,
+        category: String
     ) {
         viewModelScope.launch {
-            val pct = if (maxPrice > 0) {
-                round((gmpInr / maxPrice) * 1000.0) / 10.0
-            } else 0.0
-            val registrarUrl = when {
-                registrarName.contains("Link Intime", ignoreCase = true) ->
-                    "https://linkintime.co.in/initial_offer/public-issues.html"
-                registrarName.contains("Bigshare", ignoreCase = true) ->
-                    "https://www.bigshareonline.com/ipo_Allotment.html"
-                else -> "https://kosmic.kfintech.com/ipostatus/"
+            val res = repository.addPanProfile(holderName, panNumber, dematId, upiId, category)
+            if (res.isSuccess) {
+                _statusBanner.value = "Added $holderName (${panNumber.uppercase()}) to Encrypted PAN Vault"
+            } else {
+                _statusBanner.value = res.exceptionOrNull()?.localizedMessage ?: "Failed to save PAN profile"
             }
-            val newIpo = IpoEntity(
-                companyName = companyName.trim(),
-                symbol = symbol.trim().uppercase(),
-                series = series,
-                minPrice = minPrice,
-                maxPrice = maxPrice,
-                lotSize = lotSize,
-                issueSizeCr = issueSizeCr,
-                openDate = openDate,
-                closeDate = closeDate,
-                allotmentDate = allotmentDate,
-                refundDate = refundDate,
-                listingDate = listingDate,
-                registrarName = registrarName,
-                registrarUrl = registrarUrl,
-                status = status,
-                gmpInr = gmpInr,
-                gmpPercent = pct,
-                qibSub = qibSub,
-                niiSub = niiSub,
-                retailSub = retailSub,
-                totalSub = totalSub,
-                updatedAt = System.currentTimeMillis()
-            )
-            ipoRepository.insertIpo(newIpo)
         }
     }
-}
 
-class IpoViewModelFactory(private val ipoRepository: IpoRepository) : ViewModelProvider.Factory {
-    @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        return IpoViewModel(ipoRepository) as T
+    fun deletePanProfile(panId: String) {
+        viewModelScope.launch {
+            repository.deletePanProfile(panId)
+        }
+    }
+
+    fun submitIpoApplication(
+        ipo: LiveIpoItem,
+        panHolderName: String,
+        panNumber: String,
+        category: String,
+        lotsApplied: Int,
+        upiId: String
+    ) {
+        viewModelScope.launch {
+            val shares = (if (ipo.lotSize > 0) ipo.lotSize else 1) * lotsApplied
+            val price = if (ipo.issuePrice > 0) ipo.issuePrice else 100
+            val total = shares * price
+            val res = repository.submitIpoApplication(
+                ipoId = ipo.id,
+                ipoName = ipo.name,
+                panHolderName = panHolderName,
+                panNumber = panNumber,
+                category = category,
+                lotsApplied = lotsApplied,
+                sharesApplied = shares,
+                bidPrice = price,
+                totalAmount = total,
+                upiId = upiId,
+                status = "Applied"
+            )
+            if (res.isSuccess) {
+                _statusBanner.value = "Logged ${ipo.name} bid ($lotsApplied lot(s)) for $panHolderName!"
+            } else {
+                _statusBanner.value = res.exceptionOrNull()?.localizedMessage ?: "Failed to log IPO bid"
+            }
+        }
+    }
+
+    fun cycleApplicationStatus(app: IpoApplication) {
+        viewModelScope.launch {
+            val next = when (app.status) {
+                "Mandate Pending" -> "Applied"
+                "Applied" -> "Allotted"
+                "Allotted" -> "Not Allotted"
+                else -> "Applied"
+            }
+            repository.updateApplicationStatus(app.id, next)
+        }
+    }
+
+    fun deleteApplication(appId: String) {
+        viewModelScope.launch {
+            repository.deleteApplication(appId)
+        }
+    }
+
+    fun toggleWatchlist(ipo: LiveIpoItem, isWatched: Boolean) {
+        viewModelScope.launch {
+            repository.toggleWatchlist(ipo.id, ipo.name, isWatched)
+        }
+    }
+
+    companion object {
+        private const val TAG = "IpoViewModel"
     }
 }

@@ -2,103 +2,220 @@
   "entities": {
     "UserProfile": {
       "title": "UserProfile",
-      "description": "Authenticated investor profile for IPO One storing Google identity and verified mobile contact preferences.",
+      "description": "User profile and security settings including Biometric lock preference and mobile/Google registration info.",
       "type": "object",
       "properties": {
         "userId": {
           "type": "string",
-          "description": "The authenticated Firebase Auth UID of the user."
+          "description": "Owner Firebase Auth UID."
         },
         "displayName": {
           "type": "string",
-          "description": "Full name of the investor."
+          "description": "User full name."
         },
         "email": {
           "type": "string",
-          "description": "Email address associated with the Google account."
+          "description": "User email address."
         },
-        "mobileNumber": {
+        "phoneNumber": {
           "type": "string",
-          "description": "Mobile number (+91 format) registered for UPI mandate alerts."
+          "description": "Verified mobile number for IPO alerts and allotment."
         },
-        "investorCategory": {
+        "authProvider": {
           "type": "string",
-          "description": "Preferred investor category (RETAIL, sNII, bNII, EMPLOYEE).",
-          "enum": ["RETAIL", "sNII", "bNII", "EMPLOYEE"]
+          "description": "Sign-in method label (Google or Mobile+Google)."
         },
-        "syncedDematCount": {
-          "type": "integer",
-          "description": "Count of active family Demat accounts managed locally."
+        "biometricEnabled": {
+          "type": "boolean",
+          "description": "Whether BiometricPrompt app lock is enabled."
         },
-        "syncedApplicationCount": {
-          "type": "integer",
-          "description": "Count of tracked IPO applications."
+        "priceAlertsEnabled": {
+          "type": "boolean",
+          "description": "Whether GMP surge & subscription alerts are enabled."
         },
         "createdAt": {
           "type": "string",
           "format": "date-time",
-          "description": "Server timestamp when the profile was created (FieldValue.serverTimestamp())."
+          "description": "Creation timestamp via FieldValue.serverTimestamp()."
         },
         "updatedAt": {
           "type": "string",
           "format": "date-time",
-          "description": "Server timestamp when the profile was last updated (FieldValue.serverTimestamp())."
+          "description": "Last update timestamp via FieldValue.serverTimestamp()."
         }
       },
       "required": [
         "userId",
         "displayName",
-        "email",
-        "mobileNumber",
-        "investorCategory",
-        "syncedDematCount",
-        "syncedApplicationCount",
+        "biometricEnabled",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "PanProfile": {
+      "title": "PanProfile",
+      "description": "Family PAN & Demat account stored in the user's encrypted cloud vault for 1-click multi-lot IPO applications and allotment checks.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID."
+        },
+        "holderName": {
+          "type": "string",
+          "description": "Account holder full name as per PAN."
+        },
+        "panNumber": {
+          "type": "string",
+          "description": "10-character uppercase Indian PAN number."
+        },
+        "dematId": {
+          "type": "string",
+          "description": "16-digit CDSL/NSDL BO ID or DP Client ID."
+        },
+        "upiId": {
+          "type": "string",
+          "description": "Linked UPI ID for ASBA mandate."
+        },
+        "category": {
+          "type": "string",
+          "description": "Default investor category (Retail, sHNI, bHNI)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp on creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp on update."
+        }
+      },
+      "required": [
+        "userId",
+        "holderName",
+        "panNumber",
+        "dematId",
+        "upiId",
+        "category",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "IpoApplication": {
+      "title": "IpoApplication",
+      "description": "Tracked IPO bid/application submitted or logged by the user for allotment & profit tracking.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID."
+        },
+        "ipoId": {
+          "type": "string",
+          "description": "InvestorGain IPO ID."
+        },
+        "ipoName": {
+          "type": "string",
+          "description": "Company short name."
+        },
+        "panHolderName": {
+          "type": "string",
+          "description": "Applicant name from PAN Vault."
+        },
+        "panNumber": {
+          "type": "string",
+          "description": "10-char PAN number used for bid."
+        },
+        "category": {
+          "type": "string",
+          "description": "Investor category (Retail, sHNI, bHNI)."
+        },
+        "lotsApplied": {
+          "type": "integer",
+          "description": "Number of lots applied."
+        },
+        "sharesApplied": {
+          "type": "integer",
+          "description": "Total shares applied."
+        },
+        "bidPrice": {
+          "type": "integer",
+          "description": "Cut-off bid price per share in INR."
+        },
+        "totalAmount": {
+          "type": "integer",
+          "description": "Total blocked ASBA mandate amount in INR."
+        },
+        "upiId": {
+          "type": "string",
+          "description": "UPI ID used for mandate."
+        },
+        "status": {
+          "type": "string",
+          "description": "Application status (Mandate Pending, Applied, Allotted, Not Allotted)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp on creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp on update."
+        }
+      },
+      "required": [
+        "userId",
+        "ipoId",
+        "ipoName",
+        "panHolderName",
+        "panNumber",
+        "category",
+        "lotsApplied",
+        "sharesApplied",
+        "bidPrice",
+        "totalAmount",
+        "upiId",
+        "status",
         "createdAt",
         "updatedAt"
       ]
     },
     "WatchlistItem": {
       "title": "WatchlistItem",
-      "description": "Cloud-synced IPO watchlist entry and allotment probability target for an authenticated user.",
+      "description": "Bookmarked InvestorGain IPO for quick GMP and subscription tracking.",
       "type": "object",
       "properties": {
         "userId": {
           "type": "string",
-          "description": "The authenticated Firebase Auth UID of the owner."
+          "description": "Owner Firebase Auth UID."
         },
-        "ipoSymbol": {
+        "ipoId": {
           "type": "string",
-          "description": "NSE/BSE ticker symbol of the IPO."
+          "description": "InvestorGain IPO ID."
         },
-        "companyName": {
+        "ipoName": {
           "type": "string",
-          "description": "Company name of the IPO."
-        },
-        "targetLots": {
-          "type": "integer",
-          "description": "Planned number of lots to apply across family Demat accounts."
-        },
-        "notes": {
-          "type": "string",
-          "description": "User strategy note for the IPO."
+          "description": "Company short name."
         },
         "createdAt": {
           "type": "string",
           "format": "date-time",
-          "description": "Server timestamp when created (FieldValue.serverTimestamp())."
+          "description": "Server timestamp on creation."
         },
         "updatedAt": {
           "type": "string",
           "format": "date-time",
-          "description": "Server timestamp when updated (FieldValue.serverTimestamp())."
+          "description": "Server timestamp on update."
         }
       },
       "required": [
         "userId",
-        "ipoSymbol",
-        "companyName",
-        "targetLots",
-        "notes",
+        "ipoId",
+        "ipoName",
         "createdAt",
         "updatedAt"
       ]
@@ -106,16 +223,20 @@
   },
   "firestore": {
     "/users/{userId}": {
-      "schema": {
-        "$ref": "#/entities/UserProfile"
-      },
-      "description": "Stores per-user investor profile and mobile preferences isolated by userId."
+      "schema": "UserProfile",
+      "description": "User profile and biometric security preferences."
     },
-    "/users/{userId}/ipo_watchlists/{watchlistId}": {
-      "schema": {
-        "$ref": "#/entities/WatchlistItem"
-      },
-      "description": "Stores per-user cloud-synced IPO watchlist and strategy items."
+    "/users/{userId}/pan_profiles/{panId}": {
+      "schema": "PanProfile",
+      "description": "Encrypted/isolated family PAN and Demat accounts for the user."
+    },
+    "/users/{userId}/applications/{appId}": {
+      "schema": "IpoApplication",
+      "description": "User's tracked IPO bids and allotment status."
+    },
+    "/users/{userId}/watchlist/{ipoId}": {
+      "schema": "WatchlistItem",
+      "description": "User's watched InvestorGain IPOs."
     }
   }
 }

@@ -1,22 +1,32 @@
-# Security Specification — IPO One Cloud Profile & Watchlist Sync
+# IPO One — Firestore Security Specification
 
 ## 1. Data Invariants
-1. **Strict Ownership Isolation (`/users/{userId}`)**: A user profile document at `/users/{userId}` can only be read, created, updated, or deleted by an authenticated user whose `request.auth.uid == userId` and `incoming().userId == request.auth.uid`.
-2. **Subcollection Ownership Isolation (`/users/{userId}/ipo_watchlists/{watchlistId}`)**: A watchlist item can only be read, listed, created, updated, or deleted by the authenticated owner where `request.auth.uid == userId` and `incoming().userId == request.auth.uid`.
-3. **Immutable Identity & Creation Timestamp**: On updates to `/users/{userId}` and `/users/{userId}/ipo_watchlists/{watchlistId}`, `userId` and `createdAt` must remain strictly equal to `existing().userId` and `existing().createdAt`.
-4. **Path Variable Hardening**: `isValidId(userId)` and `isValidId(watchlistId)` enforce `^[a-zA-Z0-9_\-]+$` and `.size() <= 128` on all single-document operations (`get`, `create`, `update`, `delete`).
-5. **String & Number Bounds**: Every string field enforces `.size() <= MAX` and every number field enforces realistic numeric ranges.
+1. **User Profile (`/users/{userId}`)**:
+   - Only authenticated owner (`request.auth.uid == userId`) can read, create, update, or delete their own profile document.
+   - `userId` in payload must match `request.auth.uid` on create and is immutable on update.
+   - `createdAt` must be a valid server timestamp (`<= request.time`) and is immutable on update.
+2. **PAN Profiles (`/users/{userId}/pan_profiles/{panId}`)**:
+   - Strictly isolated per user under `/users/{userId}/pan_profiles/{panId}`.
+   - `userId` must equal `request.auth.uid` and is immutable on update.
+   - `panNumber` must be a 10-character uppercase alphanumeric string; `holderName` 2..80 chars.
+3. **IPO Applications (`/users/{userId}/applications/{appId}`)**:
+   - Strictly isolated per user under `/users/{userId}/applications/{appId}`.
+   - `userId` must equal `request.auth.uid` and is immutable on update.
+   - `lotsApplied` >= 1 and <= 1000; `bidPrice` >= 1; `totalAmount` >= 1.
+4. **Watchlist (`/users/{userId}/watchlist/{ipoId}`)**:
+   - Strictly isolated per user under `/users/{userId}/watchlist/{ipoId}`.
+   - `userId` must equal `request.auth.uid` and is immutable on update.
 
 ## 2. The "Dirty Dozen" Payloads
-1. **Unauthenticated Profile Read**: `unauthDb.collection("users").doc("alice_123").get()` -> REJECTED (`request.auth != null`).
-2. **Cross-User PII Profile Read**: `bobDb.collection("users").doc("alice_123").get()` -> REJECTED (`request.auth.uid == userId`).
-3. **Identity Spoofing on Create**: Alice creates `/users/alice_123` with `{ userId: "bob_456" }` -> REJECTED (`incoming().userId == request.auth.uid`).
-4. **Shadow Update / Ghost Field Injection**: Alice updates `/users/alice_123` adding `{ isAdmin: true }` -> REJECTED (`affectedKeys().hasOnly(...)`).
-5. **Immutable Field Mutation (`createdAt`)**: Alice updates `createdAt` on `/users/alice_123` -> REJECTED (`incoming().createdAt == existing().createdAt`).
-6. **Immutable Field Mutation (`userId`)**: Alice updates `userId` on `/users/alice_123` -> REJECTED (`incoming().userId == existing().userId`).
-7. **Value Poisoning (`displayName` > 100 chars)**: Alice sends a 500-char `displayName` -> REJECTED (`isValidUserProfile`).
-8. **Invalid Mobile Number Format**: Alice sends a 100-char string in `mobileNumber` -> REJECTED (`data.mobileNumber.size() <= 20`).
-9. **Future Timestamp Spoofing**: Alice sends `createdAt` in the future (`> request.time`) -> REJECTED (`incoming().createdAt <= request.time`).
-10. **Cross-User Subcollection List**: Bob lists `/users/alice_123/ipo_watchlists` -> REJECTED (`request.auth.uid == userId`).
-11. **Watchlist Negative Target Lots**: Alice creates a watchlist item with `targetLots: 0` or `targetLots: 500` -> REJECTED (`data.targetLots >= 1 && data.targetLots <= 100`).
-12. **Missing Required Keys on Create**: Alice creates `/users/alice_123` omitting `displayName` or `createdAt` -> REJECTED (`incoming().keys().hasAll(...)`).
+1. Unauthenticated read on `/users/alice_123` -> REJECT
+2. Cross-user read by `bob_456` on `/users/alice_123/pan_profiles/pan1` -> REJECT
+3. Identity spoofing on create: `userId: "bob_456"` written by `alice_123` -> REJECT
+4. Shadow field injection: `isAdmin: true` added to `/users/alice_123` -> REJECT
+5. Immutable field mutation: changing `createdAt` or `userId` on update -> REJECT
+6. Value poisoning: setting `lotsApplied: "ten"` (string instead of int) -> REJECT
+7. Boundary overflow: `holderName` exceeding 80 characters -> REJECT
+8. Future timestamp injection: `createdAt` in the future (`> request.time`) -> REJECT
+9. Invalid document ID injection (>128 chars or special characters) -> REJECT
+10. Missing required keys on `create` -> REJECT
+11. Unauthorized field modification on `update` outside `affectedKeys().hasOnly(...)` -> REJECT
+12. Cross-user list query on `/users/bob_456/applications` by `alice_123` -> REJECT

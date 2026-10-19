@@ -1,16 +1,20 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Global default-deny safety net
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // Global primitive helpers
     function isSignedIn() {
       return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
     function incoming() {
@@ -21,55 +25,67 @@ service cloud.firestore {
       return resource.data;
     }
 
-    function isValidId(id) {
-      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    function isValidTimestamp(ts) {
+      return ts is timestamp && ts <= request.time;
     }
 
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    // Validation Helper: UserProfile
     function isValidUserProfile(data) {
-      return data.userId is string && data.userId == request.auth.uid && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
              data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100 &&
-             data.email is string && data.email.size() <= 150 &&
-             data.mobileNumber is string && data.mobileNumber.size() <= 20 &&
-             data.investorCategory is string && data.investorCategory in ['RETAIL', 'sNII', 'bNII', 'EMPLOYEE'] &&
-             data.syncedDematCount is int && data.syncedDematCount >= 0 && data.syncedDematCount <= 100 &&
-             data.syncedApplicationCount is int && data.syncedApplicationCount >= 0 && data.syncedApplicationCount <= 1000 &&
-             data.createdAt is timestamp && data.createdAt <= request.time &&
-             data.updatedAt is timestamp && data.updatedAt <= request.time;
+             (!('email' in data) || data.email == null || (data.email is string && data.email.size() <= 150)) &&
+             (!('phoneNumber' in data) || data.phoneNumber == null || (data.phoneNumber is string && data.phoneNumber.size() <= 25)) &&
+             (!('authProvider' in data) || data.authProvider == null || (data.authProvider is string && data.authProvider.size() <= 40)) &&
+             data.biometricEnabled is bool &&
+             (!('priceAlertsEnabled' in data) || data.priceAlertsEnabled is bool) &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
     }
 
-    // Validation Helper: WatchlistItem
+    function isValidPanProfile(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.holderName is string && data.holderName.size() >= 2 && data.holderName.size() <= 80 &&
+             data.panNumber is string && data.panNumber.size() == 10 &&
+             data.dematId is string && data.dematId.size() >= 4 && data.dematId.size() <= 32 &&
+             data.upiId is string && data.upiId.size() >= 3 && data.upiId.size() <= 80 &&
+             data.category is string && data.category in ['Retail', 'sHNI', 'bHNI'] &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidIpoApplication(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.ipoId is string && data.ipoId.size() >= 1 && data.ipoId.size() <= 64 &&
+             data.ipoName is string && data.ipoName.size() >= 1 && data.ipoName.size() <= 120 &&
+             data.panHolderName is string && data.panHolderName.size() >= 2 && data.panHolderName.size() <= 80 &&
+             data.panNumber is string && data.panNumber.size() == 10 &&
+             data.category is string && data.category in ['Retail', 'sHNI', 'bHNI'] &&
+             data.lotsApplied is int && data.lotsApplied >= 1 && data.lotsApplied <= 1000 &&
+             data.sharesApplied is int && data.sharesApplied >= 1 && data.sharesApplied <= 1000000 &&
+             data.bidPrice is int && data.bidPrice >= 1 && data.bidPrice <= 100000 &&
+             data.totalAmount is int && data.totalAmount >= 1 && data.totalAmount <= 100000000 &&
+             data.upiId is string && data.upiId.size() >= 3 && data.upiId.size() <= 80 &&
+             data.status is string && data.status in ['Mandate Pending', 'Applied', 'Allotted', 'Not Allotted'] &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
     function isValidWatchlistItem(data) {
-      return data.userId is string && data.userId == request.auth.uid && data.userId.size() >= 1 && data.userId.size() <= 128 &&
-             data.ipoSymbol is string && data.ipoSymbol.size() >= 1 && data.ipoSymbol.size() <= 30 &&
-             data.companyName is string && data.companyName.size() >= 1 && data.companyName.size() <= 120 &&
-             data.targetLots is int && data.targetLots >= 1 && data.targetLots <= 100 &&
-             data.notes is string && data.notes.size() <= 500 &&
-             data.createdAt is timestamp && data.createdAt <= request.time &&
-             data.updatedAt is timestamp && data.updatedAt <= request.time;
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.ipoId is string && data.ipoId.size() >= 1 && data.ipoId.size() <= 64 &&
+             data.ipoName is string && data.ipoName.size() >= 1 && data.ipoName.size() <= 120 &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
     }
 
-    // Collection: /users/{userId}
     match /users/{userId} {
       allow get: if isOwner(userId) && isValidId(userId);
       allow list: if isOwner(userId);
 
       allow create: if isOwner(userId) &&
                        isValidId(userId) &&
-                       incoming().keys().hasAll([
-                         'userId', 'displayName', 'email', 'mobileNumber',
-                         'investorCategory', 'syncedDematCount', 'syncedApplicationCount',
-                         'createdAt', 'updatedAt'
-                       ]) &&
-                       incoming().keys().hasOnly([
-                         'userId', 'displayName', 'email', 'mobileNumber',
-                         'investorCategory', 'syncedDematCount', 'syncedApplicationCount',
-                         'createdAt', 'updatedAt'
-                       ]) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll(['userId', 'displayName', 'biometricEnabled', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'displayName', 'email', 'phoneNumber', 'authProvider', 'biometricEnabled', 'priceAlertsEnabled', 'createdAt', 'updatedAt']) &&
                        isValidUserProfile(incoming());
 
       allow update: if isOwner(userId) &&
@@ -77,42 +93,71 @@ service cloud.firestore {
                        isValidUserProfile(incoming()) &&
                        incoming().userId == existing().userId &&
                        incoming().createdAt == existing().createdAt &&
-                       incoming().diff(existing()).affectedKeys().hasOnly([
-                         'displayName', 'email', 'mobileNumber', 'investorCategory',
-                         'syncedDematCount', 'syncedApplicationCount', 'updatedAt'
-                       ]);
+                       incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'email', 'phoneNumber', 'authProvider', 'biometricEnabled', 'priceAlertsEnabled', 'updatedAt']);
 
       allow delete: if isOwner(userId) && isValidId(userId);
 
-      // Subcollection: /users/{userId}/ipo_watchlists/{watchlistId}
-      match /ipo_watchlists/{watchlistId} {
-        allow get: if isOwner(userId) && isValidId(userId) && isValidId(watchlistId);
-        allow list: if isOwner(userId);
+      match /pan_profiles/{panId} {
+        allow get: if isOwner(userId) && isValidId(panId);
+        allow list: if isOwner(userId) && existing().userId == request.auth.uid;
 
         allow create: if isOwner(userId) &&
-                         isValidId(userId) &&
-                         isValidId(watchlistId) &&
-                         incoming().keys().hasAll([
-                           'userId', 'ipoSymbol', 'companyName', 'targetLots',
-                           'notes', 'createdAt', 'updatedAt'
-                         ]) &&
-                         incoming().keys().hasOnly([
-                           'userId', 'ipoSymbol', 'companyName', 'targetLots',
-                           'notes', 'createdAt', 'updatedAt'
-                         ]) &&
+                         isValidId(panId) &&
+                         incoming().userId == request.auth.uid &&
+                         incoming().keys().hasAll(['userId', 'holderName', 'panNumber', 'dematId', 'upiId', 'category', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'holderName', 'panNumber', 'dematId', 'upiId', 'category', 'createdAt', 'updatedAt']) &&
+                         isValidPanProfile(incoming());
+
+        allow update: if isOwner(userId) &&
+                         isValidId(panId) &&
+                         isValidPanProfile(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['holderName', 'panNumber', 'dematId', 'upiId', 'category', 'updatedAt']);
+
+        allow delete: if isOwner(userId) && isValidId(panId);
+      }
+
+      match /applications/{appId} {
+        allow get: if isOwner(userId) && isValidId(appId);
+        allow list: if isOwner(userId) && existing().userId == request.auth.uid;
+
+        allow create: if isOwner(userId) &&
+                         isValidId(appId) &&
+                         incoming().userId == request.auth.uid &&
+                         incoming().keys().hasAll(['userId', 'ipoId', 'ipoName', 'panHolderName', 'panNumber', 'category', 'lotsApplied', 'sharesApplied', 'bidPrice', 'totalAmount', 'upiId', 'status', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'ipoId', 'ipoName', 'panHolderName', 'panNumber', 'category', 'lotsApplied', 'sharesApplied', 'bidPrice', 'totalAmount', 'upiId', 'status', 'createdAt', 'updatedAt']) &&
+                         isValidIpoApplication(incoming());
+
+        allow update: if isOwner(userId) &&
+                         isValidId(appId) &&
+                         isValidIpoApplication(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['status', 'lotsApplied', 'sharesApplied', 'totalAmount', 'upiId', 'updatedAt']);
+
+        allow delete: if isOwner(userId) && isValidId(appId);
+      }
+
+      match /watchlist/{ipoId} {
+        allow get: if isOwner(userId) && isValidId(ipoId);
+        allow list: if isOwner(userId) && existing().userId == request.auth.uid;
+
+        allow create: if isOwner(userId) &&
+                         isValidId(ipoId) &&
+                         incoming().userId == request.auth.uid &&
+                         incoming().keys().hasAll(['userId', 'ipoId', 'ipoName', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'ipoId', 'ipoName', 'createdAt', 'updatedAt']) &&
                          isValidWatchlistItem(incoming());
 
         allow update: if isOwner(userId) &&
-                         isValidId(userId) &&
-                         isValidId(watchlistId) &&
+                         isValidId(ipoId) &&
                          isValidWatchlistItem(incoming()) &&
                          incoming().userId == existing().userId &&
                          incoming().createdAt == existing().createdAt &&
-                         incoming().diff(existing()).affectedKeys().hasOnly([
-                           'ipoSymbol', 'companyName', 'targetLots', 'notes', 'updatedAt'
-                         ]);
+                         incoming().diff(existing()).affectedKeys().hasOnly(['ipoName', 'updatedAt']);
 
-        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(watchlistId);
+        allow delete: if isOwner(userId) && isValidId(ipoId);
       }
     }
   }

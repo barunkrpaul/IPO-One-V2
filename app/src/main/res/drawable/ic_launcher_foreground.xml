@@ -4,44 +4,36 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <group
-        android:pivotX="54"
-        android:pivotY="54">
-        <!-- Outer Hexagonal / Shield Frame -->
-        <path
-            android:fillColor="#152642"
-            android:strokeColor="#14B8A6"
-            android:strokeWidth="2.2"
-            android:pathData="M54,22 L80,35 L80,67 C80,77 68,84 54,88 C40,84 28,77 28,67 L28,35 Z" />
-
-        <!-- Inner Orbital Arc -->
-        <path
-            android:strokeColor="#38BDF8"
-            android:strokeWidth="2.5"
-            android:strokeLineCap="round"
-            android:pathData="M34,62 C34,46 46,35 62,35" />
-
-        <!-- Ascending Growth Bars (Left & Right of Numeral 1) -->
-        <path
-            android:fillColor="#38BDF8"
-            android:pathData="M36,70 L43,70 L43,56 L36,56 Z" />
-        <path
-            android:fillColor="#14B8A6"
-            android:pathData="M65,70 L72,70 L72,48 L65,48 Z" />
-
-        <!-- Bold Geometric Numeral '1' Pillar in Center -->
-        <path
-            android:fillColor="#F8FAFC"
-            android:pathData="M49,38 L58,33 L58,72 L49,72 L49,45 L44,48 L44,41 Z" />
-
-        <!-- Emerald Bullish Arrow Crown at Top of '1' -->
-        <path
-            android:fillColor="#2DD4BF"
-            android:pathData="M54,26 L66,38 L60,38 L60,44 L48,44 L48,38 L42,38 Z" />
-
-        <!-- Base Pedestal Line -->
-        <path
-            android:fillColor="#14B8A6"
-            android:pathData="M36,74 L72,74 L72,78 L36,78 Z" />
-    </group>
+    <!-- Outer subtle glow ring inside 66dp safe zone -->
+    <path
+        android:fillColor="#1A00E676"
+        android:pathData="M54,24A30,30 0,1 1,24 54A30,30 0,0 1,54 24z" />
+    <!-- Bullish Candlestick 1 -->
+    <path
+        android:fillColor="#00E676"
+        android:pathData="M35,56h6v14h-6z" />
+    <path
+        android:fillColor="#00E676"
+        android:pathData="M37,50h2v24h-2z" />
+    <!-- Bullish Candlestick 2 -->
+    <path
+        android:fillColor="#00E676"
+        android:pathData="M47,44h6v18h-6z" />
+    <path
+        android:fillColor="#00E676"
+        android:pathData="M49,38h2v28h-2z" />
+    <!-- Gold Peak Candlestick 3 ('1' Monogram Pillar) -->
+    <path
+        android:fillColor="#FFD54F"
+        android:pathData="M59,32h8v38h-8z" />
+    <path
+        android:fillColor="#FFD54F"
+        android:pathData="M62,26h2v46h-2z" />
+    <!-- Upward Arrow Trend Line -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M32,64 L48,48 L56,53 L72,33 L76,36 L56,60 L48,55 L35,68 Z" />
+    <path
+        android:fillColor="#FFD54F"
+        android:pathData="M65,31 L77,31 L77,43 Z" />
 </vector>

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="400dp"
+    android:height="180dp"
+    android:viewportWidth="400"
+    android:viewportHeight="180">
+    <path android:pathData="M0,0h400v180h-400z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="0"
+                android:startY="0"
+                android:endX="400"
+                android:endY="180"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#081226" />
+                <item android:offset="0.5" android:color="#0E2244" />
+                <item android:offset="1.0" android:color="#072D2B" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Subtle financial grid lines -->
+    <path
+        android:strokeColor="#14FFFFFF"
+        android:strokeWidth="1"
+        android:pathData="M0,45 L400,45 M0,90 L400,90 M0,135 L400,135 M80,0 L80,180 M160,0 L160,180 M240,0 L240,180 M320,0 L320,180" />
+    <!-- Glowing area under GMP trend curve -->
+    <path
+        android:fillColor="#2200E676"
+        android:pathData="M0,150 Q60,135 110,115 T220,85 T320,45 L400,25 L400,180 L0,180 Z" />
+    <!-- Glowing emerald GMP wave line -->
+    <path
+        android:strokeColor="#00E676"
+        android:strokeWidth="3.5"
+        android:pathData="M0,150 Q60,135 110,115 T220,85 T320,45 L400,25" />
+    <!-- Gold candlestick accents -->
+    <path
+        android:fillColor="#FFD54F"
+        android:pathData="M295,48h8v34h-8z M335,34h8v38h-8z M372,18h8v42h-8z" />
+</vector>
