@@ -8,4 +8,26 @@
     <string name="copyright_title">© All Rights Reserved • IPO One</string>
     <string name="copyright_authors">Built and maintained by</string>
     <string name="copyright_institution">Srikrishna College, Bagula, Nadia, WB, India</string>
+    <!-- Dashboard lifecycle sections -->
+    <string name="stage_upcoming">Upcoming</string>
+    <string name="stage_open">Open</string>
+    <string name="stage_closed">Closed</string>
+    <string name="stage_allotted">Allotted</string>
+    <string name="stage_listed">Listed</string>
+    <string name="stage_cancelled">Cancelled</string>
+    <string name="section_expand">Expand %1$s</string>
+    <string name="section_collapse">Collapse %1$s</string>
+
+    <!-- IPO card key line -->
+    <string name="key_date_opens">Opens %1$s</string>
+    <string name="key_date_closes">Closes %1$s</string>
+    <string name="key_date_allotment">Allotment %1$s</string>
+    <string name="key_date_listing">Listing %1$s</string>
+    <string name="key_date_listed">Listed %1$s</string>
+    <string name="card_gmp">GMP %1$s (%2$s)</string>
+    <string name="card_subscribed">%1$sx subscribed</string>
+    <string name="chip_pre_apply_open">Pre-apply open</string>
+    <string name="listed_issued">Issued %1$s</string>
+    <string name="listed_listed">Listed %1$s (%2$s)</string>
+    <string name="listed_now">Now %1$s (%2$s)</string>
 </resources>

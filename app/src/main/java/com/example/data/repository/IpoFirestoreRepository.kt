@@ -3,6 +3,7 @@ package com.example.data.repository
 import android.content.Context
 import com.example.R
 import com.example.data.model.IpoApplication
+import com.example.data.model.IpoExtras
 import com.example.data.model.PanProfile
 import com.example.data.model.UserProfile
 import com.example.data.model.WatchlistItem
@@ -353,6 +354,26 @@ class IpoFirestoreRepository(
                     WatchlistItem::class.java,
                     DocumentSnapshot.ServerTimestampBehavior.ESTIMATE
                 )
+            }
+            .catch { error ->
+                if (error is Exception) {
+                    handleFirestoreError(error, OperationType.LIST, colRef.path)
+                }
+                throw error
+            }
+    }
+
+    /**
+     * Hand-maintained IPO data that InvestorGain does not provide, keyed by the
+     * InvestorGain IPO id. Readable without sign-in so guests get it too.
+     */
+    fun observeIpoExtras(): Flow<Map<String, IpoExtras>> {
+        val colRef = db.collection("ipo_extras")
+        return colRef.snapshots()
+            .map { snapshot ->
+                snapshot.documents.associate { doc ->
+                    doc.id to IpoExtras.fromMap(doc.data.orEmpty())
+                }
             }
             .catch { error ->
                 if (error is Exception) {

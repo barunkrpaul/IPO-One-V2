@@ -11,7 +11,8 @@ enum class IpoStatusFilter(val label: String, val code: String) {
     UPCOMING("Upcoming", "U"),
     CLOSED("Closed", "C"),
     ALLOTTED("Allotted", "A"),
-    LISTED("Listed", "L")
+    LISTED("Listed", "L"),
+    CANCELLED("Cancelled", "X")
 }
 
 fun maskPanNumber(pan: String, hidePan: Boolean): String {
@@ -59,7 +60,13 @@ data class LiveIpoItem(
     val sortCloseDate: String,
     val updatedOn: String,
     val hasAnchor: Boolean,
-    val investorGainUrl: String
+    val investorGainUrl: String,
+    // Fields not provided by InvestorGain; filled from Firestore ipo_extras/{ipoId} when present
+    val priceBandLow: Int? = null,
+    val preApplyOpen: Boolean? = null,
+    val listingPrice: Double? = null,
+    val currentPrice: Double? = null,
+    val cancelled: Boolean? = null
 )
 
 @IgnoreExtraProperties

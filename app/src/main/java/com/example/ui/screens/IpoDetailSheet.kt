@@ -723,6 +723,8 @@ fun StatusBadge(statusCode: String, statusLabel: String) {
         "U" -> Color(0xFF451A03) to Color(0xFFFBBF24)
         "C" -> Color(0xFF1E3A8A) to Color(0xFF60A5FA)
         "LP" -> Color(0xFF065F46) to Color(0xFF6EE7B7)
+        "A" -> Color(0xFF3B0764) to Color(0xFFC084FC)
+        "X" -> Color(0xFF450A0A) to Color(0xFFF87171)
         else -> Color(0xFF334155) to Color(0xFFCBD5E1)
     }
     Surface(

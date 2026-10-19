@@ -77,6 +77,13 @@ service cloud.firestore {
              isValidTimestamp(data.updatedAt);
     }
 
+    // Hand-maintained IPO data the live feed lacks (pre-apply flag, listing/current
+    // price, cancellation). Public read so guests see it; writes only via console/admin SDK.
+    match /ipo_extras/{ipoId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     match /users/{userId} {
       allow get: if isOwner(userId) && isValidId(userId);
       allow list: if isOwner(userId);

@@ -5,11 +5,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.model.IpoApplication
 import com.example.data.model.IpoBoardFilter
+import com.example.data.model.IpoExtras
+import com.example.data.model.IpoLifecycleStage
 import com.example.data.model.IpoStatusFilter
 import com.example.data.model.LiveIpoItem
 import com.example.data.model.PanProfile
 import com.example.data.model.UserProfile
 import com.example.data.model.WatchlistItem
+import com.example.data.model.lifecycleStage
+import com.example.data.model.withExtras
 import com.example.data.remote.InvestorGainClient
 import com.example.data.repository.IpoFirestoreRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +25,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 
 sealed interface UiState<out T> {
     data object Loading : UiState<Nothing>
@@ -42,7 +47,25 @@ class IpoViewModel(
 ) : ViewModel() {
 
     private val _liveIposState = MutableStateFlow<UiState<List<LiveIpoItem>>>(UiState.Loading)
-    val liveIposState: StateFlow<UiState<List<LiveIpoItem>>> = _liveIposState.asStateFlow()
+
+    // ipo_extras/{ipoId} overlay; an unreachable or empty collection simply leaves the feed as is
+    private val ipoExtrasState: StateFlow<Map<String, IpoExtras>> = repository.observeIpoExtras()
+        .catch { e ->
+            Log.w(TAG, "ipo_extras unavailable, using InvestorGain data only", e)
+            emit(emptyMap())
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+    val liveIposState: StateFlow<UiState<List<LiveIpoItem>>> = combine(
+        _liveIposState,
+        ipoExtrasState
+    ) { state, extras ->
+        if (state is UiState.Success && extras.isNotEmpty()) {
+            UiState.Success(state.data.map { it.withExtras(extras[it.id]) })
+        } else {
+            state
+        }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, UiState.Loading)
 
     private val _statusFilter = MutableStateFlow(IpoStatusFilter.ALL)
     val statusFilter: StateFlow<IpoStatusFilter> = _statusFilter.asStateFlow()
@@ -121,7 +144,7 @@ class IpoViewModel(
     }
 
     val filteredIposState: StateFlow<UiState<List<LiveIpoItem>>> = combine(
-        _liveIposState,
+        liveIposState,
         _statusFilter,
         _boardFilter,
         _sortOption,
@@ -134,14 +157,17 @@ class IpoViewModel(
             is UiState.Loading -> UiState.Loading
             is UiState.Error -> liveState
             is UiState.Success -> {
+                val today = LocalDate.now()
                 val filtered = liveState.data.filter { item ->
+                    val stage = item.lifecycleStage(today)
                     val matchesStatus = when (status) {
                         IpoStatusFilter.ALL -> true
-                        IpoStatusFilter.OPEN -> item.statusCode == "O" || item.statusCode == "CT"
-                        IpoStatusFilter.UPCOMING -> item.statusCode == "U"
-                        IpoStatusFilter.CLOSED -> item.statusCode == "C"
-                        IpoStatusFilter.ALLOTTED -> item.statusCode == "C" || item.statusCode == "A" || item.statusCode.startsWith("L")
-                        IpoStatusFilter.LISTED -> item.statusCode.startsWith("L")
+                        IpoStatusFilter.OPEN -> stage == IpoLifecycleStage.OPEN
+                        IpoStatusFilter.UPCOMING -> stage == IpoLifecycleStage.UPCOMING
+                        IpoStatusFilter.CLOSED -> stage == IpoLifecycleStage.CLOSED
+                        IpoStatusFilter.ALLOTTED -> stage == IpoLifecycleStage.ALLOTTED
+                        IpoStatusFilter.LISTED -> stage == IpoLifecycleStage.LISTED
+                        IpoStatusFilter.CANCELLED -> stage == IpoLifecycleStage.CANCELLED
                     }
                     val matchesBoard = when (board) {
                         IpoBoardFilter.ALL -> true

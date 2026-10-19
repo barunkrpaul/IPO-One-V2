@@ -29,6 +29,8 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -52,6 +54,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,6 +65,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -69,7 +76,19 @@ import com.example.R
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.FactCheck
+import androidx.annotation.StringRes
 import com.example.data.model.IpoBoardFilter
+import com.example.data.model.IpoLifecycleStage
+import com.example.data.model.IpoDates
+import com.example.data.model.KeyDateKind
+import com.example.data.model.groupByLifecycleStage
+import com.example.data.model.lifecycleStage
+import com.example.data.model.nextKeyDate
+import com.example.data.model.stageFromStatusCode
+import com.example.data.model.subscriptionTimes
+import com.example.util.formatInr
+import com.example.util.formatSignedPercent
+import java.time.LocalDate
 import com.example.data.model.IpoStatusFilter
 import com.example.data.model.LiveIpoItem
 import com.example.data.model.PanProfile
@@ -103,10 +122,17 @@ fun MainDashboardScreen(
     val context = LocalContext.current
     var sortMenuExpanded by remember { mutableStateOf(false) }
 
+    val today = remember { LocalDate.now() }
     val allList = (allIposState as? UiState.Success)?.data ?: emptyList()
-    val openCount = allList.count { it.statusCode == "O" || it.statusCode == "CT" }
-    val upcomingCount = allList.count { it.statusCode == "U" }
-    val closedCount = allList.count { it.statusCode == "C" }
+    val stageCounts = remember(allList, today) {
+        allList.groupingBy { it.lifecycleStage(today) }.eachCount()
+    }
+    val openCount = stageCounts[IpoLifecycleStage.OPEN] ?: 0
+    val upcomingCount = stageCounts[IpoLifecycleStage.UPCOMING] ?: 0
+    val closedCount = stageCounts[IpoLifecycleStage.CLOSED] ?: 0
+    var collapsedStages by rememberSaveable {
+        mutableStateOf(setOf(IpoLifecycleStage.LISTED.name, IpoLifecycleStage.CANCELLED.name))
+    }
     val topGmpItem = allList.maxByOrNull { it.gmpPercent }
 
     LazyColumn(
@@ -557,18 +583,40 @@ fun MainDashboardScreen(
                         }
                     }
                 } else {
-                    items(ipos, key = { it.id }) { ipo ->
-                        val watched = watchedIds.contains(ipo.id)
-                        LiveIpoCard(
-                            ipo = ipo,
-                            isWatched = watched,
-                            panCount = panProfiles.size,
-                            onToggleWatch = { onToggleWatchItem(ipo, watched) },
-                            onClick = { onSelectIpo(ipo) },
-                            onCheckAllotment = if (onCheckAllotmentForIpo != null) {
-                                { onCheckAllotmentForIpo(ipo) }
-                            } else null
-                        )
+                    val sections = groupByLifecycleStage(ipos, today)
+                    sections.forEach { (stage, stageIpos) ->
+                        val expanded = stage.name !in collapsedStages
+                        item(key = "section_${stage.name}") {
+                            StageSectionHeader(
+                                stage = stage,
+                                count = stageIpos.size,
+                                expanded = expanded,
+                                onToggle = {
+                                    collapsedStages = if (expanded) {
+                                        collapsedStages + stage.name
+                                    } else {
+                                        collapsedStages - stage.name
+                                    }
+                                }
+                            )
+                        }
+                        if (expanded) {
+                            items(stageIpos, key = { it.id }) { ipo ->
+                                val watched = watchedIds.contains(ipo.id)
+                                LiveIpoCard(
+                                    ipo = ipo,
+                                    stage = stage,
+                                    today = today,
+                                    isWatched = watched,
+                                    panCount = panProfiles.size,
+                                    onToggleWatch = { onToggleWatchItem(ipo, watched) },
+                                    onClick = { onSelectIpo(ipo) },
+                                    onCheckAllotment = if (onCheckAllotmentForIpo != null) {
+                                        { onCheckAllotmentForIpo(ipo) }
+                                    } else null
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -619,6 +667,8 @@ private fun PulseStatChip(
 @Composable
 private fun LiveIpoCard(
     ipo: LiveIpoItem,
+    stage: IpoLifecycleStage,
+    today: LocalDate,
     isWatched: Boolean,
     panCount: Int = 0,
     onToggleWatch: () -> Unit,
@@ -651,7 +701,13 @@ private fun LiveIpoCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    StatusBadge(statusCode = ipo.statusCode, statusLabel = ipo.statusLabel)
+                    // The raw feed status can lag the dates (e.g. still "C" after allotment);
+                    // fall back to the stage name whenever the two disagree.
+                    StatusBadge(
+                        statusCode = stageBadgeCode(stage, ipo.statusCode),
+                        statusLabel = if (stageFromStatusCode(ipo.statusCode) == stage) ipo.statusLabel
+                        else stringResource(stageTitleRes(stage))
+                    )
                     Surface(
                         color = if (ipo.category == "Mainboard") MaterialTheme.colorScheme.primaryContainer
                         else MaterialTheme.colorScheme.secondaryContainer,
@@ -664,6 +720,21 @@ private fun LiveIpoCard(
                             else MaterialTheme.colorScheme.secondary,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                         )
+                    }
+                    if (stage == IpoLifecycleStage.UPCOMING && ipo.preApplyOpen == true) {
+                        Surface(
+                            color = Color(0xFF0C4A6E),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.chip_pre_apply_open),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Color(0xFF7DD3FC),
+                                modifier = Modifier
+                                    .padding(horizontal = 6.dp, vertical = 3.dp)
+                                    .testTag("pre_apply_chip_${ipo.id}")
+                            )
+                        }
                     }
                     if (ipo.hasAnchor) {
                         Surface(
@@ -760,6 +831,14 @@ private fun LiveIpoCard(
                         )
                     }
                 }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            IpoKeyLine(ipo = ipo, stage = stage, today = today)
+
+            if (stage == IpoLifecycleStage.LISTED) {
+                ListedPerformanceLine(ipo = ipo)
             }
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -867,4 +946,195 @@ private fun MiniMetric(
             color = if (highlight) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
         )
     }
+}
+
+private val GainGreen = Color(0xFF34D399)
+private val LossRed = Color(0xFFF87171)
+
+@StringRes
+private fun stageTitleRes(stage: IpoLifecycleStage): Int = when (stage) {
+    IpoLifecycleStage.UPCOMING -> R.string.stage_upcoming
+    IpoLifecycleStage.OPEN -> R.string.stage_open
+    IpoLifecycleStage.CLOSED -> R.string.stage_closed
+    IpoLifecycleStage.ALLOTTED -> R.string.stage_allotted
+    IpoLifecycleStage.LISTED -> R.string.stage_listed
+    IpoLifecycleStage.CANCELLED -> R.string.stage_cancelled
+}
+
+private fun stageBadgeCode(stage: IpoLifecycleStage, statusCode: String): String = when (stage) {
+    IpoLifecycleStage.UPCOMING -> "U"
+    IpoLifecycleStage.OPEN -> if (statusCode == "CT") "CT" else "O"
+    IpoLifecycleStage.CLOSED -> "C"
+    IpoLifecycleStage.ALLOTTED -> "A"
+    IpoLifecycleStage.LISTED -> if (statusCode.startsWith("L")) statusCode else "LN"
+    IpoLifecycleStage.CANCELLED -> "X"
+}
+
+private fun stageAccent(stage: IpoLifecycleStage): Color = when (stage) {
+    IpoLifecycleStage.UPCOMING -> Color(0xFFFBBF24)
+    IpoLifecycleStage.OPEN -> Color(0xFF34D399)
+    IpoLifecycleStage.CLOSED -> Color(0xFF60A5FA)
+    IpoLifecycleStage.ALLOTTED -> Color(0xFFC084FC)
+    IpoLifecycleStage.LISTED -> Color(0xFF6EE7B7)
+    IpoLifecycleStage.CANCELLED -> Color(0xFFF87171)
+}
+
+@Composable
+private fun StageSectionHeader(
+    stage: IpoLifecycleStage,
+    count: Int,
+    expanded: Boolean,
+    onToggle: () -> Unit
+) {
+    val title = stringResource(stageTitleRes(stage))
+    val accent = stageAccent(stage)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onToggle)
+            .padding(horizontal = 4.dp, vertical = 6.dp)
+            .testTag("stage_section_${stage.name.lowercase()}"),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(accent)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Surface(
+            color = accent.copy(alpha = 0.18f),
+            shape = RoundedCornerShape(50),
+            border = androidx.compose.foundation.BorderStroke(1.dp, accent.copy(alpha = 0.45f))
+        ) {
+            Text(
+                text = count.toString(),
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                color = accent,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+            )
+        }
+        Spacer(modifier = Modifier.weight(1f))
+        Icon(
+            imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+            contentDescription = stringResource(
+                if (expanded) R.string.section_collapse else R.string.section_expand,
+                title
+            ),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+/** Price band · GMP · next key date · subscription, separated by middle dots. */
+@Composable
+private fun IpoKeyLine(
+    ipo: LiveIpoItem,
+    stage: IpoLifecycleStage,
+    today: LocalDate
+) {
+    val keyDate = ipo.nextKeyDate(stage, today)
+    val keyDateText = keyDate?.let {
+        val human = IpoDates.formatHuman(it.date, today)
+        when (it.kind) {
+            KeyDateKind.OPENS -> stringResource(R.string.key_date_opens, human)
+            KeyDateKind.CLOSES -> stringResource(R.string.key_date_closes, human)
+            KeyDateKind.ALLOTMENT -> stringResource(R.string.key_date_allotment, human)
+            KeyDateKind.LISTING -> stringResource(R.string.key_date_listing, human)
+            KeyDateKind.LISTED -> stringResource(R.string.key_date_listed, human)
+        }
+    }
+    val showGmp = stage != IpoLifecycleStage.LISTED && stage != IpoLifecycleStage.CANCELLED
+    val gmpText = if (showGmp) {
+        stringResource(
+            R.string.card_gmp,
+            formatInr(ipo.gmpAmount, showPlus = true),
+            formatSignedPercent(ipo.gmpPercent)
+        )
+    } else null
+    val subscriptionText = ipo.subscriptionTimes()?.let {
+        stringResource(R.string.card_subscribed, String.format(java.util.Locale.ENGLISH, "%.2f", it))
+    }
+    val priceText = when {
+        ipo.issuePrice <= 0 -> null
+        ipo.priceBandLow != null && ipo.priceBandLow in 1 until ipo.issuePrice ->
+            "${formatInr(ipo.priceBandLow)}–${formatInr(ipo.issuePrice)}"
+        else -> formatInr(ipo.issuePrice)
+    }
+
+    val gmpColor = when {
+        ipo.gmpAmount > 0 -> GainGreen
+        ipo.gmpAmount < 0 -> LossRed
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val separator = "  ·  "
+    val parts = listOfNotNull(priceText, gmpText, keyDateText, subscriptionText)
+    if (parts.isEmpty()) return
+
+    Text(
+        text = buildAnnotatedString {
+            parts.forEachIndexed { index, part ->
+                if (index > 0) append(separator)
+                when (part) {
+                    gmpText -> withStyle(SpanStyle(color = gmpColor, fontWeight = FontWeight.Bold)) { append(part) }
+                    priceText -> withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(part) }
+                    else -> append(part)
+                }
+            }
+        },
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.testTag("ipo_key_line_${ipo.id}")
+    )
+}
+
+/** "Issued ₹A → Listed ₹B (+x%) → Now ₹C (+y%)"; hidden until a listing price is known. */
+@Composable
+private fun ListedPerformanceLine(ipo: LiveIpoItem) {
+    val listingPrice = ipo.listingPrice ?: return
+    if (ipo.issuePrice <= 0) return
+    val issue = ipo.issuePrice.toDouble()
+    val listingGain = (listingPrice - issue) / issue * 100.0
+    val currentPrice = ipo.currentPrice
+    val currentGain = currentPrice?.let { (it - issue) / issue * 100.0 }
+
+    val issuedText = stringResource(R.string.listed_issued, formatInr(ipo.issuePrice))
+    val listedText = stringResource(
+        R.string.listed_listed,
+        formatInr(listingPrice),
+        formatSignedPercent(listingGain)
+    )
+    val nowText = if (currentPrice != null && currentGain != null) {
+        stringResource(R.string.listed_now, formatInr(currentPrice), formatSignedPercent(currentGain))
+    } else null
+    val neutral = MaterialTheme.colorScheme.onSurfaceVariant
+    fun gainColor(pct: Double) = when {
+        pct > 0 -> GainGreen
+        pct < 0 -> LossRed
+        else -> neutral
+    }
+
+    Spacer(modifier = Modifier.height(6.dp))
+    Text(
+        text = buildAnnotatedString {
+            withStyle(SpanStyle(color = neutral)) { append(issuedText) }
+            append("  →  ")
+            withStyle(SpanStyle(color = gainColor(listingGain), fontWeight = FontWeight.Bold)) { append(listedText) }
+            if (nowText != null && currentGain != null) {
+                append("  →  ")
+                withStyle(SpanStyle(color = gainColor(currentGain), fontWeight = FontWeight.Bold)) { append(nowText) }
+            }
+        },
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.testTag("listed_performance_${ipo.id}")
+    )
 }
