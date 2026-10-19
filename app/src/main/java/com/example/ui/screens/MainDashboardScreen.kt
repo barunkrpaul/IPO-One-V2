@@ -50,6 +50,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -77,6 +78,7 @@ import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.FactCheck
 import androidx.annotation.StringRes
+import com.example.data.model.CalendarEvent
 import com.example.data.model.IpoBoardFilter
 import com.example.data.model.IpoLifecycleStage
 import com.example.data.model.IpoDates
@@ -117,7 +119,10 @@ fun MainDashboardScreen(
     panProfiles: List<PanProfile> = emptyList(),
     onOpenAddPanModal: (() -> Unit)? = null,
     onCheckAllotmentForIpo: ((LiveIpoItem) -> Unit)? = null,
-    hidePanNumbers: Boolean = false
+    hidePanNumbers: Boolean = false,
+    todayEvents: List<CalendarEvent> = emptyList(),
+    onViewCalendar: (() -> Unit)? = null,
+    onOpenIpoById: ((String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     var sortMenuExpanded by remember { mutableStateOf(false) }
@@ -142,6 +147,16 @@ fun MainDashboardScreen(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        if (todayEvents.isNotEmpty()) {
+            item(key = "today_events") {
+                TodayEventsStrip(
+                    events = todayEvents,
+                    onViewCalendar = onViewCalendar,
+                    onOpenIpo = onOpenIpoById
+                )
+            }
+        }
+
         // Live InvestorGain Header Banner
         item {
             Card(
@@ -1137,4 +1152,77 @@ private fun ListedPerformanceLine(ipo: LiveIpoItem) {
         color = MaterialTheme.colorScheme.onSurface,
         modifier = Modifier.testTag("listed_performance_${ipo.id}")
     )
+}
+
+/** Horizontally scrolling chips for today's confirmed IPO milestones. */
+@Composable
+private fun TodayEventsStrip(
+    events: List<CalendarEvent>,
+    onViewCalendar: (() -> Unit)?,
+    onOpenIpo: ((String) -> Unit)?
+) {
+    Column(modifier = Modifier.testTag("today_events_strip")) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = stringResource(R.string.today_events_title),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+            if (onViewCalendar != null) {
+                TextButton(
+                    onClick = onViewCalendar,
+                    modifier = Modifier.testTag("today_events_view_calendar")
+                ) {
+                    Text(stringResource(R.string.today_events_view_calendar))
+                }
+            }
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            events.forEach { event ->
+                val color = calendarEventColor(event.event)
+                Surface(
+                    color = color.copy(alpha = 0.14f),
+                    shape = RoundedCornerShape(50),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.5f)),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .then(
+                            if (onOpenIpo != null) Modifier.clickable { onOpenIpo(event.ipoId) } else Modifier
+                        )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(color)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = stringResource(
+                                R.string.today_event_chip,
+                                event.ipoName,
+                                stringResource(calendarEventLabelRes(event.event))
+                            ),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+        }
+    }
 }

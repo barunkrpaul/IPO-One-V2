@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.model.IpoApplication
+import com.example.data.model.CalendarEvent
 import com.example.data.model.IpoBoardFilter
 import com.example.data.model.IpoExtras
 import com.example.data.model.IpoLifecycleStage
@@ -12,6 +13,7 @@ import com.example.data.model.LiveIpoItem
 import com.example.data.model.PanProfile
 import com.example.data.model.UserProfile
 import com.example.data.model.WatchlistItem
+import com.example.data.model.calendarEvents
 import com.example.data.model.lifecycleStage
 import com.example.data.model.withExtras
 import com.example.data.remote.InvestorGainClient
@@ -66,6 +68,16 @@ class IpoViewModel(
             state
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, UiState.Loading)
+
+    /** All dated IPO milestones (including estimated ones) for the calendar and today's strip. */
+    val calendarEventsState: StateFlow<List<CalendarEvent>> = combine(
+        liveIposState,
+        ipoExtrasState
+    ) { state, extras ->
+        (state as? UiState.Success)?.data
+            ?.let { calendarEvents(it, extras, LocalDate.now()) }
+            .orEmpty()
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val _lastLiveRefreshMillis = MutableStateFlow<Long?>(null)
     val lastLiveRefreshMillis: StateFlow<Long?> = _lastLiveRefreshMillis.asStateFlow()

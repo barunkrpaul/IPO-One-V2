@@ -106,4 +106,28 @@
     <string name="my_applications_none">None logged for this IPO</string>
     <string name="my_applications_check_all">Check allotment for all</string>
     <string name="my_applications_row">%1$s · %2$s · %3$d lot(s) · %4$s</string>
+
+    <!-- Calendar -->
+    <string name="nav_calendar">Calendar</string>
+    <string name="calendar_title">IPO calendar</string>
+    <string name="calendar_prev_month">Previous month</string>
+    <string name="calendar_next_month">Next month</string>
+    <string name="calendar_today">Today</string>
+    <string name="calendar_no_events">No IPO events on this day.</string>
+    <string name="calendar_loading">Loading IPO dates…</string>
+    <string name="calendar_error">Could not load IPO dates.</string>
+    <string name="calendar_retry">Retry</string>
+    <string name="calendar_more">+%1$d</string>
+    <string name="calendar_event_estimated">estimated</string>
+    <string name="cal_event_opens">Opens</string>
+    <string name="cal_event_closes">Closes</string>
+    <string name="cal_event_allotment">Allotment</string>
+    <string name="cal_event_settlement">Settlement</string>
+    <string name="cal_event_listing">Listing</string>
+    <string name="cal_event_mandate_end">Mandate end</string>
+    <string name="cal_event_anchor_50" formatted="false">Anchor 50%</string>
+    <string name="cal_event_anchor_100" formatted="false">Anchor 100%</string>
+    <string name="today_events_title">Today\'s events</string>
+    <string name="today_events_view_calendar">View in calendar</string>
+    <string name="today_event_chip">%1$s · %2$s</string>
 </resources>

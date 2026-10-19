@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Security
@@ -59,6 +60,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.credentials.CredentialManager
@@ -86,6 +88,8 @@ import com.example.ui.components.RegistrarDirectCheckRequest
 import com.example.ui.components.RegistrarVerificationModalSheet
 import com.example.ui.components.detectRegistrarForIpo
 import com.example.ui.screens.AllotmentAndVaultScreen
+import com.example.data.model.eventsOn
+import com.example.ui.screens.IpoCalendarScreen
 import com.example.ui.screens.IpoDetailScreen
 import com.example.ui.screens.MainDashboardScreen
 import com.example.ui.screens.SecuritySettingsScreen
@@ -198,6 +202,8 @@ fun MainAppContent(
     val statusBanner by viewModel.statusBanner.collectAsStateWithLifecycle()
     val ipoExtras by viewModel.ipoExtrasState.collectAsStateWithLifecycle()
     val lastLiveRefreshMillis by viewModel.lastLiveRefreshMillis.collectAsStateWithLifecycle()
+    val calendarEvents by viewModel.calendarEventsState.collectAsStateWithLifecycle()
+    val todayEvents = remember(calendarEvents) { eventsOn(calendarEvents, java.time.LocalDate.now()) }
 
     val userProfile = (userProfileState as? UiState.Success)?.data
     val watchedIds = remember(watchlistState) {
@@ -208,6 +214,11 @@ fun MainAppContent(
 
     var currentTab by rememberSaveable { mutableIntStateOf(0) }
     var selectedIpo by remember { mutableStateOf<LiveIpoItem?>(null) }
+    // Tab indices: 0 dashboard, 1 allotment & vault, 2 security, 3 calendar
+    var calendarFocusDate by remember { mutableStateOf<java.time.LocalDate?>(null) }
+    val openIpoById: (String) -> Unit = { id ->
+        (allIposState as? UiState.Success)?.data?.firstOrNull { it.id == id }?.let { selectedIpo = it }
+    }
     var showQuickAddPanModal by rememberSaveable { mutableStateOf(false) }
     var activeMultiPanIpoCheck by remember { mutableStateOf<AppliedIpoSummary?>(null) }
     var activeRegistrarRequest by remember { mutableStateOf<RegistrarDirectCheckRequest?>(null) }
@@ -316,6 +327,11 @@ fun MainAppContent(
                     boaDate = detailIpo.boaDate,
                     registrar = registrar
                 )
+            },
+            onTimelineDateClick = { date ->
+                calendarFocusDate = date
+                currentTab = 3
+                selectedIpo = null
             }
         )
     } else Scaffold(
@@ -409,6 +425,13 @@ fun MainAppContent(
                     modifier = Modifier.testTag("nav_live_gmp")
                 )
                 NavigationBarItem(
+                    selected = currentTab == 3,
+                    onClick = { currentTab = 3 },
+                    icon = { Icon(Icons.Default.CalendarMonth, contentDescription = stringResource(R.string.nav_calendar)) },
+                    label = { Text(stringResource(R.string.nav_calendar)) },
+                    modifier = Modifier.testTag("nav_calendar")
+                )
+                NavigationBarItem(
                     selected = currentTab == 1,
                     onClick = { currentTab = 1 },
                     icon = { Icon(Icons.Default.AccountBalanceWallet, contentDescription = "Allotment & Vault") },
@@ -461,7 +484,22 @@ fun MainAppContent(
                             registrar = detectRegistrarForIpo(ipo.name, ipo.id)
                         )
                     },
-                    hidePanNumbers = hidePanNumbers
+                    hidePanNumbers = hidePanNumbers,
+                    todayEvents = todayEvents,
+                    onViewCalendar = {
+                        calendarFocusDate = java.time.LocalDate.now()
+                        currentTab = 3
+                    },
+                    onOpenIpoById = openIpoById
+                )
+
+                3 -> IpoCalendarScreen(
+                    liveIposState = allIposState,
+                    events = calendarEvents,
+                    focusDate = calendarFocusDate,
+                    onFocusConsumed = { calendarFocusDate = null },
+                    onOpenIpo = openIpoById,
+                    onRetry = viewModel::refreshLiveInvestorGainData
                 )
 
                 1 -> Column(modifier = Modifier.fillMaxSize()) {
