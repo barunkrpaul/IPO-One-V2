@@ -11,19 +11,21 @@ jobs:
         run: |
           UA="Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/129 Mobile Safari/537.36"
           get() { curl -sS -A "$UA" -H "Referer: https://www.investorgain.com/" -H "Accept: application/json" "$1"; }
-          for id in $(seq 200 319) $(seq 346 480); do get "https://webnodejs.investorgain.com/cloud/v2/report/data-read/$id/1/10/2026/2025-26/0/all?search=" > r$id.json; sleep 0.2
-          done
+          get "https://webnodejs.investorgain.com/cloud/v2/report/data-read/377/1/10/2026/2025-26/0/all?search=" > a.json
+          get "https://webnodejs.investorgain.com/cloud/v2/report/data-read/377/1/10/2026/2026-27/0/all?search=" > b.json
+          get "https://webnodejs.investorgain.com/cloud/v2/report/data-read/377/1/10/2026/2021-22/0/all?search=" > c.json
+          get "https://webnodejs.investorgain.com/cloud/v2/report/data-read/377/1/10/2026/2025-26/0/sme?search=" > d.json
+          get "https://webnodejs.investorgain.com/cloud/v2/report/data-read/377/1/10/2026/2025-26/0/ipo?search=" > e.json
           python3 - <<'PY'
-          import json,glob,re
-          out=[]
-          for f in sorted(glob.glob("r*.json")):
-              try:
-                  d=json.load(open(f)); rows=d.get("reportTableData") or []
-              except Exception:
-                  continue
-              if not rows: continue
-              keys=[k for k in rows[0].keys() if not k.startswith("~")][:12]
-              out.append("%s n=%s tot=%s keys=%s"%(f,len(rows),d.get("totalRecords"),keys))
-          for k in range(0,len(out),3):
-              print("::notice::"+" || ".join(out[k:k+3])[:3800])
+          import json
+          def note(t): print("::notice::"+t.replace("\n"," ")[:3900])
+          for f in ["a.json","b.json","c.json","d.json","e.json"]:
+              try: d=json.load(open(f)); rows=d.get("reportTableData") or []
+              except Exception as ex: note(f+" err "+open(f).read()[:200]); continue
+              dates=sorted(r.get("~Srt_Listing_Dt") or r.get("Listing Dt","") for r in rows)
+              note(f+" n=%d tot=%s pages=%s first=%s last=%s"%(len(rows),d.get("totalRecords"),d.get("totalPages"),dates[:1],dates[-1:]))
+          d=json.load(open("a.json"))["reportTableData"]
+          note("row0="+json.dumps(d[0],ensure_ascii=False))
+          sme=[r for r in d if "SME" in json.dumps(r)]
+          if sme: note("sme="+json.dumps(sme[0],ensure_ascii=False))
           PY
