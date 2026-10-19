@@ -10,26 +10,17 @@ jobs:
         run: |
           UA="Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/129 Mobile Safari/537.36"
           get() { curl -sS -A "$UA" -H "Referer: https://www.investorgain.com/" -H "Accept: application/json" "$1"; }
-          get "https://webnodejs.investorgain.com/cloud/v2/report/data-read/331/1/10/2026/2026-27/0/all?search=" > cur.json
-          get "https://webnodejs.investorgain.com/cloud/v2/report/data-read/331/1/6/2026/2026-27/0/all?search=" > jun.json
-          get "https://webnodejs.investorgain.com/cloud/v2/ipo/list-read" > list.json
+          for pg in 1 2 10; do get "https://webnodejs.investorgain.com/cloud/v2/report/data-read/331/$pg/10/2026/2026-27/0/all?search=" > p$pg.json; done
+          get "https://webnodejs.investorgain.com/cloud/v2/report/data-read/331/1/10/2026/2025-26/0/all?search=" > fy.json
           python3 - <<'PY'
-          import json
+          import json,re
           def note(t): print("::notice::"+t.replace("\n"," ")[:3800])
-          for f in ["cur.json","jun.json"]:
+          for f in ["p1.json","p2.json","p10.json","fy.json"]:
               try:
                   d=json.load(open(f)); rows=d.get("reportTableData",[])
               except Exception as e:
-                  note(f+" parse error "+str(e)+" "+open(f).read()[:300]); continue
-              note(f+" rows=%d topkeys=%s"%(len(rows),list(d.keys())))
-              if rows: note(f+" keys="+json.dumps(list(rows[0].keys())))
-              statuses={}
-              for r in rows: statuses.setdefault(r.get("~ipo_status1"),r)
-              for st,r in list(statuses.items())[:4]:
-                  note(f+" status="+str(st)+" row="+json.dumps(r,ensure_ascii=False))
-          try:
-              d=json.load(open("list.json")); l=d.get("ipoList",[])
-              note("list topkeys=%s n=%d"%(list(d.keys()),len(l)))
-              if l: note("list item="+json.dumps(l[0],ensure_ascii=False))
-          except Exception as e: note("list err "+str(e))
+                  note(f+" err "+open(f).read()[:200]); continue
+              meta={k:d.get(k) for k in ["totalRecords","totalPages","iPageNo","fldpage_size","sSearchWhere"]}
+              summ=[(r.get("~ipo_name"),r.get("~ipo_status1"),r.get("~Str_Listing"),re.findall(r"L@[^<]*",r.get("Name",""))) for r in rows]
+              note(f+" "+json.dumps(meta)+" first="+json.dumps(summ[:4],ensure_ascii=False)+" last="+json.dumps(summ[-3:],ensure_ascii=False))
           PY
