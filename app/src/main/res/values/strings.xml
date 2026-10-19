@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">IPO One</string>
-    <string name="tagline">Live InvestorGain GMP, Subscription &amp; Allotment Hub</string>
+    <string name="tagline">Live IPO GMP, Subscription &amp; Allotment Hub</string>
     <string name="sign_in_google">Sign in with Google</string>
     <string name="biometric_unlock_title">Unlock IPO One Vault</string>
     <string name="biometric_unlock_subtitle">Authenticate with fingerprint or face unlock to access your PAN Vault &amp; IPO portfolio</string>
+    <string name="copyright_title">© All Rights Reserved • IPO One</string>
+    <string name="copyright_authors">Built and maintained by</string>
+    <string name="copyright_institution">Srikrishna College, Bagula, Nadia, WB, India</string>
 </resources>

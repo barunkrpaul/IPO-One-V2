@@ -29,7 +29,7 @@ sealed interface UiState<out T> {
 }
 
 enum class IpoSortOption(val label: String) {
-    DEFAULT("InvestorGain Order"),
+    DEFAULT("Market Order"),
     HIGHEST_GMP_PCT("Highest GMP %"),
     HIGHEST_PROFIT("Est. Profit / Lot"),
     HIGHEST_SUB("Subscription (x)")
@@ -74,41 +74,48 @@ class IpoViewModel(
             initialValue = UiState.Loading
         )
 
-    val panProfilesState: StateFlow<UiState<List<PanProfile>>> = repository.observePanProfiles(currentUserId)
-        .map<List<PanProfile>, UiState<List<PanProfile>>> { UiState.Success(it) }
-        .catch { e ->
-            Log.w(TAG, "Error observing PAN profiles", e)
-            emit(UiState.Error(e.message ?: "Failed to load PAN Vault"))
-        }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000L),
-            initialValue = UiState.Loading
-        )
+    private val _guestPanProfiles = MutableStateFlow<List<PanProfile>>(emptyList())
+    private val _guestApplications = MutableStateFlow<List<IpoApplication>>(emptyList())
+    private val _guestWatchlist = MutableStateFlow<List<WatchlistItem>>(emptyList())
 
-    val applicationsState: StateFlow<UiState<List<IpoApplication>>> = repository.observeApplications(currentUserId)
-        .map<List<IpoApplication>, UiState<List<IpoApplication>>> { UiState.Success(it) }
-        .catch { e ->
-            Log.w(TAG, "Error observing applications", e)
-            emit(UiState.Error(e.message ?: "Failed to load IPO applications"))
-        }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000L),
-            initialValue = UiState.Loading
-        )
+    val panProfilesState: StateFlow<UiState<List<PanProfile>>> = if (currentUserId == "guest") {
+        _guestPanProfiles.map { UiState.Success(it) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), UiState.Success(emptyList()))
+    } else {
+        repository.observePanProfiles(currentUserId)
+            .map<List<PanProfile>, UiState<List<PanProfile>>> { UiState.Success(it) }
+            .catch { e ->
+                Log.w(TAG, "Error observing PAN profiles", e)
+                emit(UiState.Error(e.message ?: "Failed to load PAN Vault"))
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), UiState.Loading)
+    }
 
-    val watchlistState: StateFlow<UiState<List<WatchlistItem>>> = repository.observeWatchlist(currentUserId)
-        .map<List<WatchlistItem>, UiState<List<WatchlistItem>>> { UiState.Success(it) }
-        .catch { e ->
-            Log.w(TAG, "Error observing watchlist", e)
-            emit(UiState.Error(e.message ?: "Failed to load watchlist"))
-        }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000L),
-            initialValue = UiState.Loading
-        )
+    val applicationsState: StateFlow<UiState<List<IpoApplication>>> = if (currentUserId == "guest") {
+        _guestApplications.map { UiState.Success(it) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), UiState.Success(emptyList()))
+    } else {
+        repository.observeApplications(currentUserId)
+            .map<List<IpoApplication>, UiState<List<IpoApplication>>> { UiState.Success(it) }
+            .catch { e ->
+                Log.w(TAG, "Error observing applications", e)
+                emit(UiState.Error(e.message ?: "Failed to load IPO applications"))
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), UiState.Loading)
+    }
+
+    val watchlistState: StateFlow<UiState<List<WatchlistItem>>> = if (currentUserId == "guest") {
+        _guestWatchlist.map { UiState.Success(it) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), UiState.Success(emptyList()))
+    } else {
+        repository.observeWatchlist(currentUserId)
+            .map<List<WatchlistItem>, UiState<List<WatchlistItem>>> { UiState.Success(it) }
+            .catch { e ->
+                Log.w(TAG, "Error observing watchlist", e)
+                emit(UiState.Error(e.message ?: "Failed to load watchlist"))
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), UiState.Loading)
+    }
 
     val filteredIposState: StateFlow<UiState<List<LiveIpoItem>>> = combine(
         _liveIposState,
@@ -176,7 +183,7 @@ class IpoViewModel(
                 onFailure = { err ->
                     Log.e(TAG, "Failed to fetch live InvestorGain IPOs", err)
                     _liveIposState.value = UiState.Error(
-                        err.localizedMessage ?: "Failed to load live IPO data from InvestorGain.com"
+                        err.localizedMessage ?: "Failed to load live IPO market data"
                     )
                 }
             )
@@ -268,18 +275,36 @@ class IpoViewModel(
         category: String
     ) {
         viewModelScope.launch {
-            val res = repository.addPanProfile(holderName, panNumber, dematId, upiId, category)
-            if (res.isSuccess) {
-                _statusBanner.value = "Added $holderName (${panNumber.uppercase()}) to Encrypted PAN Vault"
+            if (currentUserId == "guest") {
+                val profile = PanProfile(
+                    id = "pan_${System.currentTimeMillis()}",
+                    userId = "guest",
+                    holderName = holderName,
+                    panNumber = panNumber.uppercase(),
+                    dematId = dematId,
+                    upiId = upiId,
+                    category = category
+                )
+                _guestPanProfiles.value = _guestPanProfiles.value + profile
+                _statusBanner.value = "Added $holderName (${panNumber.uppercase()}) to Family PAN Vault"
             } else {
-                _statusBanner.value = res.exceptionOrNull()?.localizedMessage ?: "Failed to save PAN profile"
+                val res = repository.addPanProfile(holderName, panNumber, dematId, upiId, category)
+                if (res.isSuccess) {
+                    _statusBanner.value = "Added $holderName (${panNumber.uppercase()}) to Encrypted PAN Vault"
+                } else {
+                    _statusBanner.value = res.exceptionOrNull()?.localizedMessage ?: "Failed to save PAN profile"
+                }
             }
         }
     }
 
     fun deletePanProfile(panId: String) {
         viewModelScope.launch {
-            repository.deletePanProfile(panId)
+            if (currentUserId == "guest") {
+                _guestPanProfiles.value = _guestPanProfiles.value.filter { it.id != panId }
+            } else {
+                repository.deletePanProfile(panId)
+            }
         }
     }
 
@@ -289,54 +314,105 @@ class IpoViewModel(
         panNumber: String,
         category: String,
         lotsApplied: Int,
-        upiId: String
+        upiId: String,
+        initialStatus: String = "Mandate Pending"
     ) {
         viewModelScope.launch {
             val shares = (if (ipo.lotSize > 0) ipo.lotSize else 1) * lotsApplied
             val price = if (ipo.issuePrice > 0) ipo.issuePrice else 100
             val total = shares * price
-            val res = repository.submitIpoApplication(
-                ipoId = ipo.id,
-                ipoName = ipo.name,
-                panHolderName = panHolderName,
-                panNumber = panNumber,
-                category = category,
-                lotsApplied = lotsApplied,
-                sharesApplied = shares,
-                bidPrice = price,
-                totalAmount = total,
-                upiId = upiId,
-                status = "Applied"
-            )
-            if (res.isSuccess) {
-                _statusBanner.value = "Logged ${ipo.name} bid ($lotsApplied lot(s)) for $panHolderName!"
+            if (currentUserId == "guest") {
+                val app = IpoApplication(
+                    id = "app_${System.currentTimeMillis()}",
+                    userId = "guest",
+                    ipoId = ipo.id,
+                    ipoName = ipo.name,
+                    panHolderName = panHolderName,
+                    panNumber = panNumber.uppercase(),
+                    category = category,
+                    lotsApplied = lotsApplied.toLong(),
+                    sharesApplied = shares.toLong(),
+                    bidPrice = price.toLong(),
+                    totalAmount = total.toLong(),
+                    upiId = upiId,
+                    status = initialStatus
+                )
+                _guestApplications.value = _guestApplications.value + app
+                _statusBanner.value = "Logged ${ipo.name} application ($lotsApplied lot(s)) for $panHolderName"
             } else {
-                _statusBanner.value = res.exceptionOrNull()?.localizedMessage ?: "Failed to log IPO bid"
+                val res = repository.submitIpoApplication(
+                    ipoId = ipo.id,
+                    ipoName = ipo.name,
+                    panHolderName = panHolderName,
+                    panNumber = panNumber,
+                    category = category,
+                    lotsApplied = lotsApplied,
+                    sharesApplied = shares,
+                    bidPrice = price,
+                    totalAmount = total,
+                    upiId = upiId,
+                    status = initialStatus
+                )
+                if (res.isSuccess) {
+                    _statusBanner.value = "Logged ${ipo.name} bid ($lotsApplied lot(s)) for $panHolderName!"
+                } else {
+                    _statusBanner.value = res.exceptionOrNull()?.localizedMessage ?: "Failed to log IPO bid"
+                }
             }
         }
     }
 
     fun cycleApplicationStatus(app: IpoApplication) {
+        val next = when (app.status) {
+            "Mandate Pending" -> "Applied"
+            "Applied" -> "Allotted"
+            "Allotted" -> "Not Allotted"
+            "Not Allotted" -> "Mandate Pending"
+            else -> "Mandate Pending"
+        }
+        setApplicationStatus(app, next)
+    }
+
+    fun setApplicationStatus(app: IpoApplication, newStatus: String) {
         viewModelScope.launch {
-            val next = when (app.status) {
-                "Mandate Pending" -> "Applied"
-                "Applied" -> "Allotted"
-                "Allotted" -> "Not Allotted"
-                else -> "Applied"
+            if (currentUserId == "guest") {
+                _guestApplications.value = _guestApplications.value.map {
+                    if (it.id == app.id) it.copy(status = newStatus) else it
+                }
+                _statusBanner.value = "Updated ${app.ipoName} status to: $newStatus"
+            } else {
+                repository.updateApplicationStatus(app.id, newStatus)
+                _statusBanner.value = "Updated ${app.ipoName} status to: $newStatus"
             }
-            repository.updateApplicationStatus(app.id, next)
         }
     }
 
     fun deleteApplication(appId: String) {
         viewModelScope.launch {
-            repository.deleteApplication(appId)
+            if (currentUserId == "guest") {
+                _guestApplications.value = _guestApplications.value.filter { it.id != appId }
+            } else {
+                repository.deleteApplication(appId)
+            }
         }
     }
 
     fun toggleWatchlist(ipo: LiveIpoItem, isWatched: Boolean) {
         viewModelScope.launch {
-            repository.toggleWatchlist(ipo.id, ipo.name, isWatched)
+            if (currentUserId == "guest") {
+                if (isWatched) {
+                    _guestWatchlist.value = _guestWatchlist.value + WatchlistItem(
+                        id = "watch_${ipo.id}",
+                        userId = "guest",
+                        ipoId = ipo.id,
+                        ipoName = ipo.name
+                    )
+                } else {
+                    _guestWatchlist.value = _guestWatchlist.value.filter { it.ipoId != ipo.id }
+                }
+            } else {
+                repository.toggleWatchlist(ipo.id, ipo.name, isWatched)
+            }
         }
     }
 

@@ -246,7 +246,7 @@ fun AuthScreen(
                 Box(modifier = Modifier.fillMaxSize()) {
                     Image(
                         painter = painterResource(id = R.drawable.img_ipo_hero_banner),
-                        contentDescription = "IPO One Live InvestorGain Tracker",
+                        contentDescription = "IPO One Live Market Tracker",
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
@@ -283,7 +283,7 @@ fun AuthScreen(
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        text = "LIVE INVESTORGAIN.COM FEED",
+                                        text = "LIVE MARKET DATA FEED",
                                         style = MaterialTheme.typography.labelMedium,
                                         color = MaterialTheme.colorScheme.primary
                                     )
@@ -656,7 +656,7 @@ fun AuthScreen(
                 FeatureBadgeCard(
                     icon = Icons.Default.TrendingUp,
                     title = "Live GMP",
-                    subtitle = "InvestorGain API",
+                    subtitle = "Real-Time Feed",
                     modifier = Modifier.weight(1f)
                 )
                 FeatureBadgeCard(
@@ -672,6 +672,10 @@ fun AuthScreen(
                     modifier = Modifier.weight(1f)
                 )
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            com.example.ui.components.CopyrightAttributionCard()
         }
     }
 }

@@ -117,7 +117,7 @@ fun MainDashboardScreen(
                 Box(modifier = Modifier.fillMaxWidth()) {
                     Image(
                         painter = painterResource(id = R.drawable.img_ipo_hero_banner),
-                        contentDescription = "InvestorGain Live IPO Dashboard",
+                        contentDescription = "Live IPO Market Dashboard",
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(175.dp),
@@ -146,22 +146,11 @@ fun MainDashboardScreen(
                                 Surface(
                                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
                                     shape = RoundedCornerShape(50),
-                                    modifier = Modifier
-                                        .border(
-                                            1.dp,
-                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
-                                            RoundedCornerShape(50)
-                                        )
-                                        .clickable {
-                                            runCatching {
-                                                context.startActivity(
-                                                    Intent(
-                                                        Intent.ACTION_VIEW,
-                                                        Uri.parse("https://www.investorgain.com/report/live-ipo-gmp/331/")
-                                                    )
-                                                )
-                                            }
-                                        }
+                                    modifier = Modifier.border(
+                                        1.dp,
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                                        RoundedCornerShape(50)
+                                    )
                                 ) {
                                     Row(
                                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
@@ -175,16 +164,9 @@ fun MainDashboardScreen(
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
-                                            text = "LIVE FROM INVESTORGAIN.COM",
+                                            text = "LIVE MARKET FEED",
                                             style = MaterialTheme.typography.labelMedium,
                                             color = MaterialTheme.colorScheme.primary
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Icon(
-                                            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                                            contentDescription = "Open InvestorGain",
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(13.dp)
                                         )
                                     }
                                 }
@@ -199,7 +181,7 @@ fun MainDashboardScreen(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Refresh,
-                                        contentDescription = "Refresh Live InvestorGain Data",
+                                        contentDescription = "Refresh Live IPO Data",
                                         tint = Color.White
                                     )
                                 }
@@ -228,6 +210,11 @@ fun MainDashboardScreen(
                     }
                 }
             }
+        }
+
+        // Prominent Developer & Academic Institution Attribution Card
+        item {
+            com.example.ui.components.CopyrightAttributionCard()
         }
 
         // Search + Sort + Watchlist Row
@@ -377,12 +364,12 @@ fun MainDashboardScreen(
                             CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.height(14.dp))
                             Text(
-                                text = "Syncing Live Mainboard & SME IPOs from InvestorGain.com...",
+                                text = "Syncing Live Mainboard & SME IPOs...",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Fetching Report #331 (Live GMP) & Report #333 (Live Subscriptions)",
+                                text = "Fetching real-time Grey Market Premiums & live subscription data",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -424,7 +411,7 @@ fun MainDashboardScreen(
                             ) {
                                 Icon(Icons.Default.Refresh, contentDescription = null)
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Retry InvestorGain Sync")
+                                Text("Retry Sync")
                             }
                         }
                     }
@@ -478,6 +465,13 @@ fun MainDashboardScreen(
                     }
                 }
             }
+        }
+
+        // Copyright & Developer Attribution Footer
+        item {
+            com.example.ui.components.CopyrightAttributionCard(
+                modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+            )
         }
     }
 }

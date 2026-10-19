@@ -65,6 +65,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.data.model.LiveIpoItem
 import com.example.data.model.PanProfile
+import com.example.ui.components.AllotmentRegistrar
+import com.example.ui.components.RegistrarDirectCheckRequest
+import com.example.ui.components.RegistrarVerificationModalSheet
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -78,7 +81,6 @@ fun IpoDetailSheet(
     onDismiss: () -> Unit
 ) {
     BackHandler { onDismiss() }
-    val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     var selectedLots by remember { mutableIntStateOf(1) }
@@ -88,6 +90,7 @@ fun IpoDetailSheet(
     var customPanNumber by remember { mutableStateOf(panProfiles.firstOrNull()?.panNumber ?: "") }
     var customUpiId by remember { mutableStateOf(panProfiles.firstOrNull()?.upiId ?: "") }
     var showApplyForm by remember { mutableStateOf(false) }
+    var activeRegistrarRequest by remember { mutableStateOf<RegistrarDirectCheckRequest?>(null) }
 
     val lotShares = if (ipo.lotSize > 0) ipo.lotSize else 1
     val totalShares = lotShares * selectedLots
@@ -184,7 +187,7 @@ fun IpoDetailSheet(
                     ) {
                         Column {
                             Text(
-                                text = "LIVE INVESTORGAIN GMP",
+                                text = "LIVE GREY MARKET PREMIUM",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
@@ -276,9 +279,8 @@ fun IpoDetailSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Live InvestorGain Subscription Breakdown
             Text(
-                text = "Live Subscription Breakdown (InvestorGain)",
+                text = "Live Subscription Breakdown",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -359,42 +361,18 @@ fun IpoDetailSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Log IPO Bid / Apply with PAN Vault
             if (!showApplyForm) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                Button(
+                    onClick = { showApplyForm = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                        .testTag("open_apply_form_button"),
+                    shape = RoundedCornerShape(14.dp)
                 ) {
-                    Button(
-                        onClick = { showApplyForm = true },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(50.dp)
-                            .testTag("open_apply_form_button"),
-                        shape = RoundedCornerShape(14.dp)
-                    ) {
-                        Icon(Icons.Default.AddCircle, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Log / Track IPO Bid")
-                    }
-
-                    OutlinedButton(
-                        onClick = {
-                            runCatching {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(ipo.investorGainUrl))
-                                context.startActivity(intent)
-                            }
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(50.dp)
-                            .testTag("open_investorgain_url_button"),
-                        shape = RoundedCornerShape(14.dp)
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("InvestorGain Report")
-                    }
+                    Icon(Icons.Default.AddCircle, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Log / Track IPO Bid")
                 }
             } else {
                 Card(
@@ -495,7 +473,104 @@ fun IpoDetailSheet(
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // 1-Click Allotment Registrar Direct Check Card inside IPO Detail Sheet
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("detail_sheet_registrar_check_card"),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                )
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Allotment Registrar Direct Check",
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "One-click allotment status verification (BoA: ${ipo.boaDate.ifBlank { "TBA" }})",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf(
+                            AllotmentRegistrar.LINK_INTIME,
+                            AllotmentRegistrar.KFINTECH,
+                            AllotmentRegistrar.BIGSHARE
+                        ).forEach { reg ->
+                            Surface(
+                                color = reg.accentColor.copy(alpha = 0.14f),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .border(
+                                        1.dp,
+                                        reg.accentColor.copy(alpha = 0.45f),
+                                        RoundedCornerShape(10.dp)
+                                    )
+                                    .clickable {
+                                        activeRegistrarRequest = RegistrarDirectCheckRequest(
+                                            registrar = reg,
+                                            panNumber = customPanNumber.trim().uppercase(),
+                                            holderName = customHolderName.ifBlank { "Primary Investor" },
+                                            ipoName = ipo.name
+                                        )
+                                    }
+                                    .testTag("detail_check_${reg.name.lowercase()}")
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 9.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Verified,
+                                        contentDescription = null,
+                                        tint = reg.accentColor,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = reg.shortName,
+                                        style = MaterialTheme.typography.labelMedium.copy(
+                                            fontWeight = FontWeight.Bold
+                                        ),
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
+    }
+
+    activeRegistrarRequest?.let { req ->
+        RegistrarVerificationModalSheet(
+            request = req,
+            onDismiss = { activeRegistrarRequest = null }
+        )
     }
 }
 

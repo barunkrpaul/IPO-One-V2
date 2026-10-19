@@ -337,5 +337,12 @@ fun SecuritySettingsScreen(
                 }
             }
         }
+
+        // Copyright & Developer Attribution Card
+        item {
+            com.example.ui.components.CopyrightAttributionCard(
+                modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
+            )
+        }
     }
 }

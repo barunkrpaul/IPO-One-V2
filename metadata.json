@@ -1,6 +1,6 @@
 {
   "name": "IPO One",
-  "description": "Live Indian Mainboard & SME IPO Tracker powered by InvestorGain real-time GMP, QIB/HNI/Retail subscription data, PAN Vault, Allotment Checker, and Biometric Security.",
+  "description": "Live Indian Mainboard & SME IPO Tracker with real-time GMP, QIB/HNI/Retail subscription data, PAN Vault, Allotment Checker, and Biometric Security.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

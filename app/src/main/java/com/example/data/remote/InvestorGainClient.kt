@@ -190,7 +190,7 @@ class InvestorGainClient(
             }
 
             if (items.isEmpty()) {
-                throw IllegalStateException("InvestorGain returned 0 live IPO records.")
+                throw IllegalStateException("Live market feed returned 0 IPO records.")
             }
             items
         }
@@ -199,7 +199,7 @@ class InvestorGainClient(
     private fun fetchReportTable(reportId: Int, month: Int, year: Int, fy: String) =
         fetchReportTableInternal("$BASE_API/report/data-read/$reportId/1/$month/$year/$fy/0/all?search=")
             ?: fetchReportTableInternal("$BASE_API/report/data-read/$reportId/1/10/2026/2026-27/0/all?search=")
-            ?: throw IllegalStateException("Unable to load live report $reportId from InvestorGain")
+            ?: throw IllegalStateException("Unable to load live market report $reportId")
 
     private fun fetchReportTableInternal(url: String): org.json.JSONArray? {
         val req = Request.Builder()

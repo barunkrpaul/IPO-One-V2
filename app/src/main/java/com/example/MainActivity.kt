@@ -5,6 +5,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -255,18 +256,6 @@ fun MainAppContent(
                             style = MaterialTheme.typography.headlineMedium,
                             color = MaterialTheme.colorScheme.primary
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Surface(
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            shape = RoundedCornerShape(6.dp)
-                        ) {
-                            Text(
-                                text = "InvestorGain Live",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.secondary,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                            )
-                        }
                     }
                 },
                 actions = {
@@ -310,9 +299,9 @@ fun MainAppContent(
                 NavigationBarItem(
                     selected = currentTab == 1,
                     onClick = { currentTab = 1 },
-                    icon = { Icon(Icons.Default.AccountBalanceWallet, contentDescription = "PAN Vault & Allotment") },
-                    label = { Text("PAN & Bids") },
-                    modifier = Modifier.testTag("nav_pan_vault")
+                    icon = { Icon(Icons.Default.AccountBalanceWallet, contentDescription = "Allotment & Vault") },
+                    label = { Text("Allotment & Vault") },
+                    modifier = Modifier.testTag("nav_allotment_vault")
                 )
                 NavigationBarItem(
                     selected = currentTab == 2,
@@ -349,15 +338,54 @@ fun MainAppContent(
                     onSelectIpo = { selectedIpo = it }
                 )
 
-                1 -> if (isGuestMode) {
-                    GuestVaultPlaceholder(onSignInRequested = onSignInRequested)
-                } else {
+                1 -> Column(modifier = Modifier.fillMaxSize()) {
+                    if (isGuestMode) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                .clickable { onSignInRequested() }
+                                .testTag("guest_sync_reminder_banner")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    modifier = Modifier.weight(1f),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.VerifiedUser,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Guest Mode: Vault active on-device. Sign In anytime to enable Cloud Sync.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                                Text(
+                                    text = "Sign In",
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
                     AllotmentAndVaultScreen(
                         panProfilesState = panProfilesState,
                         applicationsState = applicationsState,
                         onAddPanProfile = viewModel::addPanProfile,
                         onDeletePanProfile = viewModel::deletePanProfile,
                         onCycleApplicationStatus = viewModel::cycleApplicationStatus,
+                        onUpdateApplicationStatus = viewModel::setApplicationStatus,
                         onDeleteApplication = viewModel::deleteApplication
                     )
                 }

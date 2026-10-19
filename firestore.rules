@@ -99,7 +99,7 @@ service cloud.firestore {
 
       match /pan_profiles/{panId} {
         allow get: if isOwner(userId) && isValidId(panId);
-        allow list: if isOwner(userId) && existing().userId == request.auth.uid;
+        allow list: if isOwner(userId);
 
         allow create: if isOwner(userId) &&
                          isValidId(panId) &&
@@ -120,7 +120,7 @@ service cloud.firestore {
 
       match /applications/{appId} {
         allow get: if isOwner(userId) && isValidId(appId);
-        allow list: if isOwner(userId) && existing().userId == request.auth.uid;
+        allow list: if isOwner(userId);
 
         allow create: if isOwner(userId) &&
                          isValidId(appId) &&
@@ -141,7 +141,7 @@ service cloud.firestore {
 
       match /watchlist/{ipoId} {
         allow get: if isOwner(userId) && isValidId(ipoId);
-        allow list: if isOwner(userId) && existing().userId == request.auth.uid;
+        allow list: if isOwner(userId);
 
         allow create: if isOwner(userId) &&
                          isValidId(ipoId) &&

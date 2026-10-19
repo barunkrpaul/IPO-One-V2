@@ -52,24 +52,20 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.VerifiedUser
+import androidx.compose.material3.ButtonDefaults
 import com.example.data.model.IpoApplication
 import com.example.data.model.PanProfile
+import com.example.ui.components.AllotmentRegistrar
+import com.example.ui.components.RegistrarDirectCheckRequest
+import com.example.ui.components.RegistrarVerificationModalSheet
+import com.example.ui.components.copyPanToClipboard
 import com.example.ui.viewmodel.UiState
 
-data class RegistrarPortal(
-    val name: String,
-    val subtitle: String,
-    val url: String
-)
-
-private val REGISTRAR_PORTALS = listOf(
-    RegistrarPortal("Link Intime (MUFG)", "Mainboard & SME Registrar", "https://in.mpms.mufg.com/Initial_Offer/public-issues.html"),
-    RegistrarPortal("KFintech IPO Status", "KOSMIC Allotment Portal", "https://kosmic.kfintech.com/ipostatus/"),
-    RegistrarPortal("Bigshare Services", "Mainboard & SME Allotment", "https://ipo.bigshareonline.com/IPO_Status.html"),
-    RegistrarPortal("BSE India Official", "Direct Exchange PAN Verification", "https://www.bseindia.com/investors/appli_check.aspx"),
-    RegistrarPortal("InvestorGain Allotment", "Live BoA & Allotment Links", "https://www.investorgain.com/report/live-ipo-gmp/331/")
-)
-
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AllotmentAndVaultScreen(
     panProfilesState: UiState<List<PanProfile>>,
@@ -77,7 +73,8 @@ fun AllotmentAndVaultScreen(
     onAddPanProfile: (holderName: String, panNumber: String, dematId: String, upiId: String, category: String) -> Unit,
     onDeletePanProfile: (String) -> Unit,
     onCycleApplicationStatus: (IpoApplication) -> Unit,
-    onDeleteApplication: (String) -> Unit
+    onDeleteApplication: (String) -> Unit,
+    onUpdateApplicationStatus: ((IpoApplication, String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     var showAddPanForm by remember { mutableStateOf(false) }
@@ -90,6 +87,15 @@ fun AllotmentAndVaultScreen(
 
     val panList = (panProfilesState as? UiState.Success)?.data ?: emptyList()
     val appList = (applicationsState as? UiState.Success)?.data ?: emptyList()
+
+    var selectedQuickPanIndex by remember { mutableStateOf(0) }
+    var customQuickPan by remember(panList) {
+        mutableStateOf(panList.firstOrNull()?.panNumber ?: "")
+    }
+    var customQuickHolder by remember(panList) {
+        mutableStateOf(panList.firstOrNull()?.holderName ?: "Primary Investor")
+    }
+    var activeRegistrarRequest by remember { mutableStateOf<RegistrarDirectCheckRequest?>(null) }
 
     LazyColumn(
         modifier = Modifier
@@ -390,10 +396,14 @@ fun AllotmentAndVaultScreen(
                                 color = when (app.status) {
                                     "Allotted" -> Color(0xFF064E3B)
                                     "Not Allotted" -> Color(0xFF450A0A)
+                                    "Mandate Pending" -> Color(0xFF451A03)
+                                    "Applied" -> Color(0xFF1E3A8A)
                                     else -> MaterialTheme.colorScheme.secondaryContainer
                                 },
                                 shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.clickable { onCycleApplicationStatus(app) }
+                                modifier = Modifier
+                                    .clickable { onCycleApplicationStatus(app) }
+                                    .testTag("cycle_app_status_${app.id}")
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
@@ -402,7 +412,12 @@ fun AllotmentAndVaultScreen(
                                     Icon(
                                         imageVector = Icons.Default.Sync,
                                         contentDescription = "Cycle status",
-                                        tint = MaterialTheme.colorScheme.secondary,
+                                        tint = when (app.status) {
+                                            "Allotted" -> Color(0xFF34D399)
+                                            "Not Allotted" -> Color(0xFFF87171)
+                                            "Mandate Pending" -> Color(0xFFFBBF24)
+                                            else -> Color(0xFF60A5FA)
+                                        },
                                         modifier = Modifier.size(14.dp)
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
@@ -439,60 +454,328 @@ fun AllotmentAndVaultScreen(
                                 )
                             }
                         }
-                    }
-                }
-            }
-        }
 
-        // Section 3: Direct Registrar Allotment Verification Portals
-        item {
-            Text(
-                text = "Official Registrar Allotment Portals",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                REGISTRAR_PORTALS.forEach { portal ->
-                    Surface(
-                        color = MaterialTheme.colorScheme.surface,
-                        shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                runCatching {
-                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(portal.url)))
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // 1-Click Direct Registrar Check Row for this Tracked Application
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = "1-Click Allotment Registrar Direct Check:",
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = "Auto-PAN Fill",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    listOf(
+                                        AllotmentRegistrar.LINK_INTIME,
+                                        AllotmentRegistrar.KFINTECH,
+                                        AllotmentRegistrar.BIGSHARE
+                                    ).forEach { reg ->
+                                        Surface(
+                                            color = reg.accentColor.copy(alpha = 0.14f),
+                                            shape = RoundedCornerShape(10.dp),
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .border(
+                                                    1.dp,
+                                                    reg.accentColor.copy(alpha = 0.45f),
+                                                    RoundedCornerShape(10.dp)
+                                                )
+                                                .clickable {
+                                                    activeRegistrarRequest = RegistrarDirectCheckRequest(
+                                                        registrar = reg,
+                                                        panNumber = app.panNumber,
+                                                        holderName = app.panHolderName,
+                                                        ipoName = app.ipoName,
+                                                        application = app
+                                                    )
+                                                }
+                                                .testTag("app_check_${reg.name.lowercase()}_${app.id}")
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                                                horizontalArrangement = Arrangement.Center,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.VerifiedUser,
+                                                    contentDescription = null,
+                                                    tint = reg.accentColor,
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(
+                                                    text = reg.shortName,
+                                                    style = MaterialTheme.typography.labelMedium.copy(
+                                                        fontWeight = FontWeight.Bold
+                                                    ),
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                    maxLines = 1
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(14.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text(
-                                    text = portal.name,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = portal.subtitle,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                                contentDescription = "Open ${portal.name}",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
                         }
                     }
                 }
             }
         }
+
+        // Section 3: Allotment Registrar Direct Check Console (Link Intime, KFintech, Bigshare)
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("registrar_direct_check_card"),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.VerifiedUser,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "Allotment Registrar Direct Check",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "One-click allotment status verification against Link Intime, KFintech, and Bigshare",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Family PAN Selector Chips for 1-Click Check
+                    if (panList.isNotEmpty()) {
+                        Text(
+                            text = "Select Family PAN for 1-Click Verification:",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            panList.forEachIndexed { index, profile ->
+                                FilterChip(
+                                    selected = selectedQuickPanIndex == index && customQuickPan == profile.panNumber,
+                                    onClick = {
+                                        selectedQuickPanIndex = index
+                                        customQuickPan = profile.panNumber
+                                        customQuickHolder = profile.holderName
+                                    },
+                                    label = {
+                                        Text("${profile.holderName} (${profile.panNumber})")
+                                    },
+                                    modifier = Modifier.testTag("quick_pan_chip_${profile.panNumber}")
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    // Editable / Instant PAN Bar with Copy Button
+                    OutlinedTextField(
+                        value = customQuickPan,
+                        onValueChange = { customQuickPan = it.uppercase().take(10) },
+                        label = { Text("PAN for Instant Registrar Check (Auto-Copied & Injected)") },
+                        placeholder = { Text("ABCDE1234F") },
+                        singleLine = true,
+                        trailingIcon = {
+                            if (customQuickPan.isNotBlank()) {
+                                IconButton(
+                                    onClick = {
+                                        copyPanToClipboard(context, customQuickPan, "Registrar Check")
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ContentCopy,
+                                        contentDescription = "Copy PAN",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("direct_check_pan_input")
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Primary 3 Registrars: Link Intime, KFintech, Bigshare
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        AllotmentRegistrar.entries.forEach { registrar ->
+                            Surface(
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                shape = RoundedCornerShape(16.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .border(
+                                        1.dp,
+                                        registrar.accentColor.copy(alpha = 0.4f),
+                                        RoundedCornerShape(16.dp)
+                                    )
+                                    .clickable {
+                                        activeRegistrarRequest = RegistrarDirectCheckRequest(
+                                            registrar = registrar,
+                                            panNumber = customQuickPan.trim().uppercase(),
+                                            holderName = customQuickHolder.ifBlank { "Primary Investor" }
+                                        )
+                                    }
+                                    .testTag("direct_check_${registrar.name}")
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(40.dp)
+                                                .background(
+                                                    registrar.accentColor.copy(alpha = 0.16f),
+                                                    RoundedCornerShape(12.dp)
+                                                ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.FactCheck,
+                                                contentDescription = null,
+                                                tint = registrar.accentColor,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Column {
+                                            Text(
+                                                text = registrar.fullName,
+                                                style = MaterialTheme.typography.titleMedium.copy(
+                                                    fontWeight = FontWeight.Bold
+                                                ),
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Text(
+                                                text = registrar.subtitle,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Button(
+                                            onClick = {
+                                                activeRegistrarRequest = RegistrarDirectCheckRequest(
+                                                    registrar = registrar,
+                                                    panNumber = customQuickPan.trim().uppercase(),
+                                                    holderName = customQuickHolder.ifBlank { "Primary Investor" }
+                                                )
+                                            },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = registrar.accentColor,
+                                                contentColor = Color(0xFF04131A)
+                                            ),
+                                            shape = RoundedCornerShape(10.dp),
+                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                            modifier = Modifier.height(36.dp)
+                                        ) {
+                                            Text(
+                                                text = "Verify Now",
+                                                style = MaterialTheme.typography.labelMedium.copy(
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        IconButton(
+                                            onClick = {
+                                                copyPanToClipboard(context, customQuickPan, registrar.shortName)
+                                                runCatching {
+                                                    context.startActivity(
+                                                        Intent(Intent.ACTION_VIEW, Uri.parse(registrar.portalUrl))
+                                                    )
+                                                }
+                                            },
+                                            modifier = Modifier.size(34.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                                                contentDescription = "Open ${registrar.fullName} in Browser",
+                                                tint = registrar.accentColor,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Copyright & Developer Attribution Footer
+        item {
+            com.example.ui.components.CopyrightAttributionCard(
+                modifier = Modifier.padding(top = 6.dp, bottom = 8.dp)
+            )
+        }
+    }
+
+    activeRegistrarRequest?.let { req ->
+        RegistrarVerificationModalSheet(
+            request = req,
+            onDismiss = { activeRegistrarRequest = null },
+            onUpdateApplicationStatus = onUpdateApplicationStatus ?: { app, _ ->
+                onCycleApplicationStatus(app)
+            }
+        )
     }
 }
