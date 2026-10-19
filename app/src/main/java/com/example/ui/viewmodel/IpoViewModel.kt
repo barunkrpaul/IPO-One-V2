@@ -59,6 +59,9 @@ class IpoViewModel(
     private val _onlyWatchlist = MutableStateFlow(false)
     val onlyWatchlist: StateFlow<Boolean> = _onlyWatchlist.asStateFlow()
 
+    private val _hidePanNumbers = MutableStateFlow(false)
+    val hidePanNumbers: StateFlow<Boolean> = _hidePanNumbers.asStateFlow()
+
     private val _statusBanner = MutableStateFlow<String?>(null)
     val statusBanner: StateFlow<String?> = _statusBanner.asStateFlow()
 
@@ -137,6 +140,7 @@ class IpoViewModel(
                         IpoStatusFilter.OPEN -> item.statusCode == "O" || item.statusCode == "CT"
                         IpoStatusFilter.UPCOMING -> item.statusCode == "U"
                         IpoStatusFilter.CLOSED -> item.statusCode == "C"
+                        IpoStatusFilter.ALLOTTED -> item.statusCode == "C" || item.statusCode == "A" || item.statusCode.startsWith("L")
                         IpoStatusFilter.LISTED -> item.statusCode.startsWith("L")
                     }
                     val matchesBoard = when (board) {
@@ -208,6 +212,15 @@ class IpoViewModel(
 
     fun toggleOnlyWatchlist() {
         _onlyWatchlist.value = !_onlyWatchlist.value
+    }
+
+    fun toggleHidePanNumbers() {
+        _hidePanNumbers.value = !_hidePanNumbers.value
+        _statusBanner.value = if (_hidePanNumbers.value) {
+            "Privacy Mode ON: PAN numbers are now masked (ABCDE****F)"
+        } else {
+            "Privacy Mode OFF: Full PAN numbers visible"
+        }
     }
 
     fun clearBanner() {
@@ -298,6 +311,40 @@ class IpoViewModel(
         }
     }
 
+    fun updatePanProfile(
+        panId: String,
+        holderName: String,
+        panNumber: String,
+        dematId: String,
+        upiId: String,
+        category: String
+    ) {
+        viewModelScope.launch {
+            val safePan = panNumber.trim().uppercase().padEnd(10, 'X').take(10)
+            if (currentUserId == "guest") {
+                _guestPanProfiles.value = _guestPanProfiles.value.map {
+                    if (it.id == panId) {
+                        it.copy(
+                            holderName = holderName.trim(),
+                            panNumber = safePan,
+                            dematId = dematId.trim().ifBlank { "1208160000000001" },
+                            upiId = upiId.trim().ifBlank { "investor@upi" },
+                            category = category
+                        )
+                    } else it
+                }
+                _statusBanner.value = "Updated PAN profile for $holderName ($safePan)"
+            } else {
+                val res = repository.updatePanProfile(panId, holderName, safePan, dematId, upiId, category)
+                if (res.isSuccess) {
+                    _statusBanner.value = "Updated PAN profile for $holderName ($safePan)"
+                } else {
+                    _statusBanner.value = res.exceptionOrNull()?.localizedMessage ?: "Failed to update PAN profile"
+                }
+            }
+        }
+    }
+
     fun deletePanProfile(panId: String) {
         viewModelScope.launch {
             if (currentUserId == "guest") {
@@ -379,10 +426,181 @@ class IpoViewModel(
                 _guestApplications.value = _guestApplications.value.map {
                     if (it.id == app.id) it.copy(status = newStatus) else it
                 }
-                _statusBanner.value = "Updated ${app.ipoName} status to: $newStatus"
+                _statusBanner.value = "Updated ${app.ipoName} (${app.panNumber}) status to: $newStatus"
             } else {
                 repository.updateApplicationStatus(app.id, newStatus)
-                _statusBanner.value = "Updated ${app.ipoName} status to: $newStatus"
+                _statusBanner.value = "Updated ${app.ipoName} (${app.panNumber}) status to: $newStatus"
+            }
+        }
+    }
+
+    fun requestNewMandate(app: IpoApplication, newUpiId: String) {
+        viewModelScope.launch {
+            val cleanUpi = newUpiId.trim().ifBlank { app.upiId.ifBlank { "investor@upi" } }
+            if (currentUserId == "guest") {
+                _guestApplications.value = _guestApplications.value.map {
+                    if (it.id == app.id) it.copy(upiId = cleanUpi, status = "Mandate Pending") else it
+                }
+                _statusBanner.value = "New UPI Mandate requested on $cleanUpi for ${app.panHolderName} (${app.ipoName})"
+            } else {
+                val res = repository.requestNewMandate(app.id, cleanUpi)
+                if (res.isSuccess) {
+                    _statusBanner.value = "New UPI Mandate requested on $cleanUpi for ${app.panHolderName} (${app.ipoName})"
+                } else {
+                    _statusBanner.value = "Failed to request new UPI mandate"
+                }
+            }
+        }
+    }
+
+    fun applyIpoForAllSavedPans(
+        ipo: LiveIpoItem,
+        panProfiles: List<PanProfile>,
+        lotsPerPan: Int = 1,
+        isPreApply: Boolean = false
+    ) {
+        viewModelScope.launch {
+            val existingApps = (applicationsState.value as? UiState.Success)?.data ?: emptyList()
+            val lotShares = if (ipo.lotSize > 0) ipo.lotSize else 15
+            val safeLots = lotsPerPan.coerceIn(1, 25)
+            val shares = lotShares * safeLots
+            val price = if (ipo.issuePrice > 0) ipo.issuePrice else 100
+            val total = shares * price
+            val targetStatus = if (isPreApply || ipo.statusCode == "U") "Mandate Pending" else "Applied"
+
+            val profilesToUse = if (panProfiles.isNotEmpty()) {
+                panProfiles
+            } else {
+                listOf(
+                    PanProfile(
+                        id = "default_pan",
+                        userId = currentUserId,
+                        holderName = "Primary Investor",
+                        panNumber = "ABCDE1234F",
+                        dematId = "1208160000000001",
+                        upiId = "investor@upi",
+                        category = "Retail"
+                    )
+                )
+            }
+
+            var addedCount = 0
+            for (pan in profilesToUse) {
+                val alreadyExists = existingApps.any {
+                    (it.ipoId == ipo.id || it.ipoName.equals(ipo.name, ignoreCase = true)) &&
+                        it.panNumber.equals(pan.panNumber, ignoreCase = true)
+                }
+                if (!alreadyExists) {
+                    addedCount++
+                    if (currentUserId == "guest") {
+                        val app = IpoApplication(
+                            id = "app_${ipo.id}_${pan.panNumber}_${System.currentTimeMillis()}",
+                            userId = "guest",
+                            ipoId = ipo.id,
+                            ipoName = ipo.name,
+                            panHolderName = pan.holderName.ifBlank { "Investor" },
+                            panNumber = pan.panNumber.uppercase().padEnd(10, 'X').take(10),
+                            category = pan.category.ifBlank { "Retail" },
+                            lotsApplied = safeLots.toLong(),
+                            sharesApplied = shares.toLong(),
+                            bidPrice = price.toLong(),
+                            totalAmount = total.toLong(),
+                            upiId = pan.upiId.ifBlank { "investor@upi" },
+                            status = targetStatus
+                        )
+                        _guestApplications.value = _guestApplications.value + app
+                    } else {
+                        repository.submitIpoApplication(
+                            ipoId = ipo.id,
+                            ipoName = ipo.name,
+                            panHolderName = pan.holderName.ifBlank { "Investor" },
+                            panNumber = pan.panNumber.uppercase().padEnd(10, 'X').take(10),
+                            category = pan.category.ifBlank { "Retail" },
+                            lotsApplied = safeLots,
+                            sharesApplied = shares,
+                            bidPrice = price,
+                            totalAmount = total,
+                            upiId = pan.upiId.ifBlank { "investor@upi" },
+                            status = targetStatus
+                        )
+                    }
+                }
+            }
+            _statusBanner.value = if (addedCount > 0) {
+                if (isPreApply || ipo.statusCode == "U") {
+                    "Pre-Applied ${ipo.name} for $addedCount PAN card(s) • Mandate queued!"
+                } else {
+                    "Added ${ipo.name} to Applied IPOs for $addedCount saved PAN card(s)"
+                }
+            } else {
+                "${ipo.name} is ready for Multi-PAN Allotment Check"
+            }
+        }
+    }
+
+    fun saveBatchAllotmentResults(
+        ipoId: String,
+        ipoName: String,
+        lotSize: Int,
+        issuePrice: Int,
+        results: Map<PanProfile, String>
+    ) {
+        viewModelScope.launch {
+            val existingApps = (applicationsState.value as? UiState.Success)?.data ?: emptyList()
+            val shares = (if (lotSize > 0) lotSize else 15).coerceIn(1, 1000000)
+            val price = (if (issuePrice > 0) issuePrice else 100).coerceIn(1, 100000)
+            val total = (shares * price).coerceIn(1, 100000000)
+
+            for ((pan, resolvedStatus) in results) {
+                val safePan = pan.panNumber.trim().uppercase().padEnd(10, 'X').take(10)
+                val existing = existingApps.firstOrNull {
+                    (it.ipoId == ipoId || it.ipoName.equals(ipoName, ignoreCase = true)) &&
+                        it.panNumber.equals(safePan, ignoreCase = true)
+                }
+                if (existing != null) {
+                    if (existing.status != resolvedStatus) {
+                        if (currentUserId == "guest") {
+                            _guestApplications.value = _guestApplications.value.map {
+                                if (it.id == existing.id) it.copy(status = resolvedStatus) else it
+                            }
+                        } else {
+                            repository.updateApplicationStatus(existing.id, resolvedStatus)
+                        }
+                    }
+                } else {
+                    if (currentUserId == "guest") {
+                        val newApp = IpoApplication(
+                            id = "app_${ipoId}_${safePan}_${System.currentTimeMillis()}",
+                            userId = "guest",
+                            ipoId = ipoId.ifBlank { "ipo_${ipoName.hashCode()}" },
+                            ipoName = ipoName,
+                            panHolderName = pan.holderName.ifBlank { "Investor" },
+                            panNumber = safePan,
+                            category = pan.category.ifBlank { "Retail" },
+                            lotsApplied = 1L,
+                            sharesApplied = shares.toLong(),
+                            bidPrice = price.toLong(),
+                            totalAmount = total.toLong(),
+                            upiId = pan.upiId.ifBlank { "investor@upi" },
+                            status = resolvedStatus
+                        )
+                        _guestApplications.value = _guestApplications.value + newApp
+                    } else {
+                        repository.submitIpoApplication(
+                            ipoId = ipoId.ifBlank { "ipo_${ipoName.hashCode()}" },
+                            ipoName = ipoName,
+                            panHolderName = pan.holderName.ifBlank { "Investor" },
+                            panNumber = safePan,
+                            category = pan.category.ifBlank { "Retail" },
+                            lotsApplied = 1,
+                            sharesApplied = shares,
+                            bidPrice = price,
+                            totalAmount = total,
+                            upiId = pan.upiId.ifBlank { "investor@upi" },
+                            status = resolvedStatus
+                        )
+                    }
+                }
             }
         }
     }

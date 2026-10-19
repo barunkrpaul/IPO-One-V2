@@ -4,6 +4,7 @@ import com.example.data.model.IpoApplication
 import com.example.data.model.IpoBoardFilter
 import com.example.data.model.IpoStatusFilter
 import com.example.data.model.PanProfile
+import com.example.data.model.maskPanNumber
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -24,6 +25,12 @@ class IpoDomainUnitTest {
         assertEquals("Rahul Sharma", profile.holderName)
         assertEquals("ABCPS1234F", profile.panNumber)
         assertEquals("Retail", profile.category)
+    }
+
+    @Test
+    fun testMaskPanNumber() {
+        assertEquals("ABCPS****F", maskPanNumber("ABCPS1234F", true))
+        assertEquals("ABCPS1234F", maskPanNumber("ABCPS1234F", false))
     }
 
     @Test
@@ -57,7 +64,8 @@ class IpoDomainUnitTest {
         assertEquals("All Boards", IpoBoardFilter.ALL.label)
         assertEquals("Mainboard", IpoBoardFilter.MAINBOARD.label)
         assertEquals("SME", IpoBoardFilter.SME.label)
-        assertEquals("Open Now", IpoStatusFilter.OPEN.label)
+        assertEquals("Open", IpoStatusFilter.OPEN.label)
+        assertEquals("Allotted", IpoStatusFilter.ALLOTTED.label)
         assertEquals("All Live", IpoStatusFilter.ALL.label)
     }
 }

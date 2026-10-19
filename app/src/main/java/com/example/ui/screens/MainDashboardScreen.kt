@@ -66,9 +66,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.R
+import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.FactCheck
 import com.example.data.model.IpoBoardFilter
 import com.example.data.model.IpoStatusFilter
 import com.example.data.model.LiveIpoItem
+import com.example.data.model.PanProfile
+import com.example.data.model.maskPanNumber
 import com.example.ui.viewmodel.IpoSortOption
 import com.example.ui.viewmodel.UiState
 
@@ -89,7 +94,11 @@ fun MainDashboardScreen(
     onToggleOnlyWatchlist: () -> Unit,
     onToggleWatchItem: (LiveIpoItem, Boolean) -> Unit,
     onRefresh: () -> Unit,
-    onSelectIpo: (LiveIpoItem) -> Unit
+    onSelectIpo: (LiveIpoItem) -> Unit,
+    panProfiles: List<PanProfile> = emptyList(),
+    onOpenAddPanModal: (() -> Unit)? = null,
+    onCheckAllotmentForIpo: ((LiveIpoItem) -> Unit)? = null,
+    hidePanNumbers: Boolean = false
 ) {
     val context = LocalContext.current
     var sortMenuExpanded by remember { mutableStateOf(false) }
@@ -206,6 +215,100 @@ fun MainDashboardScreen(
                                     PulseStatChip("Total Tracked", allList.size.toString(), Color.White, Modifier.weight(1f))
                                 }
                             }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Post-Login Saved PAN Cards & 1-Click Auto Allotment Quick Bar
+        if (onOpenAddPanModal != null) {
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("dashboard_pan_quick_bar"),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.AccountBalanceWallet,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (panProfiles.isEmpty()) {
+                                        "Add PAN Cards for Auto-Allotment"
+                                    } else {
+                                        "${panProfiles.size} PAN Card(s) Saved for Auto-Check"
+                                    },
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = if (panProfiles.isEmpty()) {
+                                        "Save family PANs once to check allotment status in 1 click"
+                                    } else {
+                                        panProfiles.joinToString(" • ") {
+                                            "${it.holderName} (${maskPanNumber(it.panNumber, hidePanNumbers)})"
+                                        }
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Button(
+                            onClick = onOpenAddPanModal,
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                            modifier = Modifier.testTag("dashboard_add_pan_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Add PAN",
+                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                            )
                         }
                     }
                 }
@@ -459,8 +562,12 @@ fun MainDashboardScreen(
                         LiveIpoCard(
                             ipo = ipo,
                             isWatched = watched,
+                            panCount = panProfiles.size,
                             onToggleWatch = { onToggleWatchItem(ipo, watched) },
-                            onClick = { onSelectIpo(ipo) }
+                            onClick = { onSelectIpo(ipo) },
+                            onCheckAllotment = if (onCheckAllotmentForIpo != null) {
+                                { onCheckAllotmentForIpo(ipo) }
+                            } else null
                         )
                     }
                 }
@@ -513,8 +620,10 @@ private fun PulseStatChip(
 private fun LiveIpoCard(
     ipo: LiveIpoItem,
     isWatched: Boolean,
+    panCount: Int = 0,
     onToggleWatch: () -> Unit,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onCheckAllotment: (() -> Unit)? = null
 ) {
     Card(
         modifier = Modifier
@@ -693,6 +802,46 @@ private fun LiveIpoCard(
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+            }
+
+            if (onCheckAllotment != null) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Surface(
+                    color = Color(0xFF064E3B).copy(alpha = 0.55f),
+                    shape = RoundedCornerShape(10.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.45f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onCheckAllotment() }
+                        .testTag("card_check_allotment_${ipo.id}")
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FactCheck,
+                            contentDescription = null,
+                            tint = Color(0xFF34D399),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (panCount > 0) {
+                                "Click to Check Allotment Status (Auto-Check All $panCount Saved PANs)"
+                            } else {
+                                "Click to Check Allotment Status (Auto-Check Saved PANs)"
+                            },
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = Color(0xFF6EE7B7),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
         }

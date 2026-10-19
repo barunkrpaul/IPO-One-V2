@@ -73,6 +73,18 @@ import com.example.data.remote.InvestorGainClient
 import com.example.data.repository.IpoFirestoreRepository
 import com.example.ui.auth.AuthScreen
 import com.example.ui.auth.signOutUser
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
+import com.example.ui.components.AppliedIpoSummary
+import com.example.ui.components.MultiPanAllotmentCheckModalSheet
+import com.example.ui.components.QuickAddPanModalSheet
+import com.example.ui.components.RegistrarDirectCheckRequest
+import com.example.ui.components.RegistrarVerificationModalSheet
+import com.example.ui.components.detectRegistrarForIpo
 import com.example.ui.screens.AllotmentAndVaultScreen
 import com.example.ui.screens.IpoDetailSheet
 import com.example.ui.screens.MainDashboardScreen
@@ -178,6 +190,7 @@ fun MainAppContent(
     val sortOption by viewModel.sortOption.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val onlyWatchlist by viewModel.onlyWatchlist.collectAsStateWithLifecycle()
+    val hidePanNumbers by viewModel.hidePanNumbers.collectAsStateWithLifecycle()
     val userProfileState by viewModel.userProfileState.collectAsStateWithLifecycle()
     val panProfilesState by viewModel.panProfilesState.collectAsStateWithLifecycle()
     val applicationsState by viewModel.applicationsState.collectAsStateWithLifecycle()
@@ -189,9 +202,13 @@ fun MainAppContent(
         (watchlistState as? UiState.Success)?.data?.map { it.ipoId }?.toSet() ?: emptySet()
     }
     val panList = (panProfilesState as? UiState.Success)?.data ?: emptyList()
+    val appList = (applicationsState as? UiState.Success)?.data ?: emptyList()
 
     var currentTab by rememberSaveable { mutableIntStateOf(0) }
     var selectedIpo by remember { mutableStateOf<LiveIpoItem?>(null) }
+    var showQuickAddPanModal by rememberSaveable { mutableStateOf(false) }
+    var activeMultiPanIpoCheck by remember { mutableStateOf<AppliedIpoSummary?>(null) }
+    var activeRegistrarRequest by remember { mutableStateOf<RegistrarDirectCheckRequest?>(null) }
     var isVaultLocked by rememberSaveable { mutableStateOf(false) }
     var lockInitializedForSession by rememberSaveable { mutableStateOf(false) }
 
@@ -259,13 +276,51 @@ fun MainAppContent(
                     }
                 },
                 actions = {
+                    if (panList.isNotEmpty()) {
+                        IconButton(
+                            onClick = { viewModel.toggleHidePanNumbers() },
+                            modifier = Modifier
+                                .size(36.dp)
+                                .testTag("top_toggle_hide_pan_button")
+                        ) {
+                            Icon(
+                                imageVector = if (hidePanNumbers) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = if (hidePanNumbers) "Show PAN Numbers" else "Hide PAN Numbers",
+                                tint = if (hidePanNumbers) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+
+                    OutlinedButton(
+                        onClick = { showQuickAddPanModal = true },
+                        modifier = Modifier
+                            .padding(end = 8.dp)
+                            .height(36.dp)
+                            .testTag("top_add_pan_button"),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = null,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (panList.isEmpty()) "Add PAN" else "PANs (${panList.size})",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                        )
+                    }
+
                     if (isGuestMode) {
                         Button(
                             onClick = onSignInRequested,
                             modifier = Modifier
                                 .padding(end = 8.dp)
+                                .height(36.dp)
                                 .testTag("top_sign_in_button"),
                             shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.primary
                             )
@@ -273,10 +328,10 @@ fun MainAppContent(
                             Icon(
                                 imageVector = Icons.Default.VerifiedUser,
                                 contentDescription = null,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(15.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Sign In")
+                            Text("Sign In", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
                         }
                     }
                 },
@@ -335,7 +390,21 @@ fun MainAppContent(
                     onToggleOnlyWatchlist = viewModel::toggleOnlyWatchlist,
                     onToggleWatchItem = viewModel::toggleWatchlist,
                     onRefresh = viewModel::refreshLiveInvestorGainData,
-                    onSelectIpo = { selectedIpo = it }
+                    onSelectIpo = { selectedIpo = it },
+                    panProfiles = panList,
+                    onOpenAddPanModal = { showQuickAddPanModal = true },
+                    onCheckAllotmentForIpo = { ipo ->
+                        activeMultiPanIpoCheck = AppliedIpoSummary(
+                            ipoId = ipo.id,
+                            ipoName = ipo.name,
+                            category = ipo.category,
+                            issuePrice = if (ipo.issuePrice > 0) ipo.issuePrice else 100,
+                            lotSize = if (ipo.lotSize > 0) ipo.lotSize else 15,
+                            boaDate = ipo.boaDate,
+                            registrar = detectRegistrarForIpo(ipo.name, ipo.id)
+                        )
+                    },
+                    hidePanNumbers = hidePanNumbers
                 )
 
                 1 -> Column(modifier = Modifier.fillMaxSize()) {
@@ -383,10 +452,27 @@ fun MainAppContent(
                         panProfilesState = panProfilesState,
                         applicationsState = applicationsState,
                         onAddPanProfile = viewModel::addPanProfile,
+                        onUpdatePanProfile = viewModel::updatePanProfile,
                         onDeletePanProfile = viewModel::deletePanProfile,
                         onCycleApplicationStatus = viewModel::cycleApplicationStatus,
                         onUpdateApplicationStatus = viewModel::setApplicationStatus,
-                        onDeleteApplication = viewModel::deleteApplication
+                        onRequestNewMandate = viewModel::requestNewMandate,
+                        onDeleteApplication = viewModel::deleteApplication,
+                        liveIposState = allIposState,
+                        onApplyIpoForAllPans = { ipo, pans ->
+                            viewModel.applyIpoForAllSavedPans(ipo, pans)
+                        },
+                        onSaveBatchAllotmentResults = { summary, results ->
+                            viewModel.saveBatchAllotmentResults(
+                                ipoId = summary.ipoId,
+                                ipoName = summary.ipoName,
+                                lotSize = summary.lotSize,
+                                issuePrice = summary.issuePrice,
+                                results = results
+                            )
+                        },
+                        hidePanNumbers = hidePanNumbers,
+                        onToggleHidePanNumbers = viewModel::toggleHidePanNumbers
                     )
                 }
 
@@ -412,11 +498,66 @@ fun MainAppContent(
                                 onSignOutComplete = onSignInRequested,
                                 scope = scope
                             )
-                        }
+                        },
+                        panProfiles = panList,
+                        onOpenAddPanModal = { showQuickAddPanModal = true }
                     )
                 }
             }
         }
+    }
+
+    if (showQuickAddPanModal) {
+        QuickAddPanModalSheet(
+            panProfiles = panList,
+            onAddPanProfile = viewModel::addPanProfile,
+            onUpdatePanProfile = viewModel::updatePanProfile,
+            onDeletePanProfile = viewModel::deletePanProfile,
+            hidePanNumbers = hidePanNumbers,
+            onToggleHidePanNumbers = viewModel::toggleHidePanNumbers,
+            onDismiss = { showQuickAddPanModal = false }
+        )
+    }
+
+    activeMultiPanIpoCheck?.let { targetIpo ->
+        MultiPanAllotmentCheckModalSheet(
+            appliedIpo = targetIpo,
+            panProfiles = panList,
+            existingApplications = appList,
+            onSaveBatchResults = { results ->
+                viewModel.saveBatchAllotmentResults(
+                    ipoId = targetIpo.ipoId,
+                    ipoName = targetIpo.ipoName,
+                    lotSize = targetIpo.lotSize,
+                    issuePrice = targetIpo.issuePrice,
+                    results = results
+                )
+            },
+            onToggleSinglePanStatus = { pan, newStatus ->
+                viewModel.saveBatchAllotmentResults(
+                    ipoId = targetIpo.ipoId,
+                    ipoName = targetIpo.ipoName,
+                    lotSize = targetIpo.lotSize,
+                    issuePrice = targetIpo.issuePrice,
+                    results = mapOf(pan to newStatus)
+                )
+            },
+            onAddPanProfile = viewModel::addPanProfile,
+            onOpenOfficialRegistrar = { req ->
+                activeRegistrarRequest = req
+            },
+            onDismiss = { activeMultiPanIpoCheck = null },
+            hidePanNumbers = hidePanNumbers,
+            onToggleHidePanNumbers = viewModel::toggleHidePanNumbers
+        )
+    }
+
+    activeRegistrarRequest?.let { req ->
+        RegistrarVerificationModalSheet(
+            request = req,
+            onDismiss = { activeRegistrarRequest = null },
+            onUpdateApplicationStatus = viewModel::setApplicationStatus
+        )
     }
 
     selectedIpo?.let { ipo ->
@@ -425,27 +566,35 @@ fun MainAppContent(
             isWatched = watchedIds.contains(ipo.id),
             panProfiles = panList,
             onToggleWatch = {
-                if (isGuestMode) {
-                    onSignInRequested()
-                } else {
-                    viewModel.toggleWatchlist(ipo, watchedIds.contains(ipo.id))
-                }
+                viewModel.toggleWatchlist(ipo, watchedIds.contains(ipo.id))
             },
             onSubmitBid = { panHolderName, panNumber, category, lots, upiId ->
-                if (isGuestMode) {
-                    onSignInRequested()
-                } else {
-                    viewModel.submitIpoApplication(
-                        ipo = ipo,
-                        panHolderName = panHolderName,
-                        panNumber = panNumber,
-                        category = category,
-                        lotsApplied = lots,
-                        upiId = upiId
-                    )
-                }
+                viewModel.submitIpoApplication(
+                    ipo = ipo,
+                    panHolderName = panHolderName,
+                    panNumber = panNumber,
+                    category = category,
+                    lotsApplied = lots,
+                    upiId = upiId
+                )
             },
-            onDismiss = { selectedIpo = null }
+            onDismiss = { selectedIpo = null },
+            existingApplications = appList,
+            onApplyForAllPans = { targetIpo, pans ->
+                viewModel.applyIpoForAllSavedPans(targetIpo, pans)
+            },
+            onSaveBatchAllotmentResults = { summary, results ->
+                viewModel.saveBatchAllotmentResults(
+                    ipoId = summary.ipoId,
+                    ipoName = summary.ipoName,
+                    lotSize = summary.lotSize,
+                    issuePrice = summary.issuePrice,
+                    results = results
+                )
+            },
+            onAddPanProfile = viewModel::addPanProfile,
+            hidePanNumbers = hidePanNumbers,
+            onToggleHidePanNumbers = viewModel::toggleHidePanNumbers
         )
     }
 }

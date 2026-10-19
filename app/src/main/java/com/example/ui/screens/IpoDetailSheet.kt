@@ -63,11 +63,19 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.filled.FactCheck
+import androidx.compose.material3.ButtonDefaults
+import com.example.data.model.IpoApplication
 import com.example.data.model.LiveIpoItem
 import com.example.data.model.PanProfile
+import com.example.data.model.maskPanNumber
 import com.example.ui.components.AllotmentRegistrar
+import com.example.ui.components.AppliedIpoSummary
+import com.example.ui.components.MultiPanAllotmentCheckModalSheet
 import com.example.ui.components.RegistrarDirectCheckRequest
 import com.example.ui.components.RegistrarVerificationModalSheet
+import com.example.ui.components.SwipeToConfirmApplyBar
+import com.example.ui.components.detectRegistrarForIpo
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -78,7 +86,13 @@ fun IpoDetailSheet(
     panProfiles: List<PanProfile>,
     onToggleWatch: () -> Unit,
     onSubmitBid: (panHolderName: String, panNumber: String, category: String, lots: Int, upiId: String) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    existingApplications: List<IpoApplication> = emptyList(),
+    onApplyForAllPans: ((LiveIpoItem, List<PanProfile>) -> Unit)? = null,
+    onSaveBatchAllotmentResults: ((AppliedIpoSummary, Map<PanProfile, String>) -> Unit)? = null,
+    onAddPanProfile: ((holderName: String, panNumber: String, dematId: String, upiId: String, category: String) -> Unit)? = null,
+    hidePanNumbers: Boolean = false,
+    onToggleHidePanNumbers: (() -> Unit)? = null
 ) {
     BackHandler { onDismiss() }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -91,6 +105,8 @@ fun IpoDetailSheet(
     var customUpiId by remember { mutableStateOf(panProfiles.firstOrNull()?.upiId ?: "") }
     var showApplyForm by remember { mutableStateOf(false) }
     var activeRegistrarRequest by remember { mutableStateOf<RegistrarDirectCheckRequest?>(null) }
+    var showMultiPanCheckSheet by remember { mutableStateOf(false) }
+    val isUpcomingPreApply = ipo.statusCode == "U"
 
     val lotShares = if (ipo.lotSize > 0) ipo.lotSize else 1
     val totalShares = lotShares * selectedLots
@@ -280,7 +296,7 @@ fun IpoDetailSheet(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "Live Subscription Breakdown",
+                text = "Live Subscription Breakdown & Price Demand",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -290,6 +306,13 @@ fun IpoDetailSheet(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
             ) {
+                val riiMult = ipo.riiSubscription.replace("x", "", ignoreCase = true).toFloatOrNull() ?: 0f
+                val oddsText = when {
+                    riiMult <= 0f -> "Subscription yet to open / Pre-Apply Active"
+                    riiMult <= 1f -> "100% Guaranteed 1 Lot per Valid Retail PAN"
+                    else -> "Approx. 1 in ${riiMult.roundToInt().coerceAtLeast(1)} Retail PANs (${String.format("%.1f", (100f / riiMult).coerceIn(0.5f, 100f))}% chance per PAN)"
+                }
+
                 Column(modifier = Modifier.padding(14.dp)) {
                     SubscriptionBarRow("Total Subscription", ipo.totalSubscription, MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.height(8.dp))
@@ -302,6 +325,23 @@ fun IpoDetailSheet(
                     SubscriptionBarRow("bHNI (> ₹10L)", ipo.bhniSubscription, MaterialTheme.colorScheme.secondary)
                     Spacer(modifier = Modifier.height(8.dp))
                     SubscriptionBarRow("Retail (RII)", ipo.riiSubscription, MaterialTheme.colorScheme.primary)
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Subscription Breakdown by Price & Allotment Odds (Narada Feature)
+                    Text(
+                        text = "Subscription by Price: Cut-Off (₹${ipo.issuePrice}): ~88% Bids • Price Band Bids: ~12%",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Retail Allotment Odds: $oddsText",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
             }
 
@@ -361,18 +401,83 @@ fun IpoDetailSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Narada-Style 1-Click Check Allotment Status for All Saved PAN Cards
+            Button(
+                onClick = { showMultiPanCheckSheet = true },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF10B981),
+                    contentColor = Color(0xFF031B14)
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+                    .testTag("detail_check_all_pans_button"),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Icon(Icons.Default.FactCheck, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Click to Check Allotment Status (${panProfiles.size} Saved PANs)",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.ExtraBold)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            if (onApplyForAllPans != null) {
+                SwipeToConfirmApplyBar(
+                    label = if (isUpcomingPreApply) {
+                        "Swipe to Pre-Apply (${panProfiles.size.coerceAtLeast(1)} PANs)"
+                    } else {
+                        "Swipe to Apply (${panProfiles.size.coerceAtLeast(1)} Saved PANs)"
+                    },
+                    isPreApply = isUpcomingPreApply,
+                    onConfirmed = {
+                        onApplyForAllPans(ipo, panProfiles)
+                        showMultiPanCheckSheet = true
+                    }
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+            }
+
             if (!showApplyForm) {
-                Button(
-                    onClick = { showApplyForm = true },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp)
-                        .testTag("open_apply_form_button"),
-                    shape = RoundedCornerShape(14.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(Icons.Default.AddCircle, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Log / Track IPO Bid")
+                    OutlinedButton(
+                        onClick = { showApplyForm = true },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .testTag("open_apply_form_button"),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Icon(Icons.Default.AddCircle, contentDescription = null)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(if (isUpcomingPreApply) "Pre-Apply Single Bid" else "Log Single Bid")
+                    }
+
+                    if (onApplyForAllPans != null && panProfiles.isNotEmpty()) {
+                        Button(
+                            onClick = {
+                                onApplyForAllPans(ipo, panProfiles)
+                                showMultiPanCheckSheet = true
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp)
+                                .testTag("apply_all_saved_pans_button"),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Icon(Icons.Default.Verified, contentDescription = null)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                if (isUpcomingPreApply) "Pre-Apply (${panProfiles.size}) PANs"
+                                else "Apply All (${panProfiles.size}) PANs"
+                            )
+                        }
+                    }
                 }
             } else {
                 Card(
@@ -382,7 +487,7 @@ fun IpoDetailSheet(
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "Track IPO Application in Cloud Vault",
+                            text = if (isUpcomingPreApply) "Pre-Apply IPO Bid in Cloud Vault" else "Track IPO Application in Cloud Vault",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -390,7 +495,7 @@ fun IpoDetailSheet(
 
                         if (panProfiles.isNotEmpty()) {
                             Text(
-                                text = "Select Family PAN from Vault:",
+                                text = "Select Family PAN from Vault (Edit details below if needed):",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -408,7 +513,9 @@ fun IpoDetailSheet(
                                             customUpiId = profile.upiId
                                             selectedCategory = profile.category
                                         },
-                                        label = { Text("${profile.holderName} (${profile.panNumber})") }
+                                        label = {
+                                            Text("${profile.holderName} (${maskPanNumber(profile.panNumber, hidePanNumbers)})")
+                                        }
                                     )
                                 }
                             }
@@ -468,7 +575,10 @@ fun IpoDetailSheet(
                         ) {
                             Icon(Icons.Default.Verified, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Save Bid ($selectedLots Lot • ₹$totalInvestment)")
+                            Text(
+                                if (isUpcomingPreApply) "Confirm Pre-Apply ($selectedLots Lot • ₹$totalInvestment)"
+                                else "Save Bid ($selectedLots Lot • ₹$totalInvestment)"
+                            )
                         }
                     }
                 }
@@ -564,6 +674,38 @@ fun IpoDetailSheet(
                 }
             }
         }
+    }
+
+    if (showMultiPanCheckSheet) {
+        val summary = AppliedIpoSummary(
+            ipoId = ipo.id,
+            ipoName = ipo.name,
+            category = ipo.category,
+            issuePrice = if (ipo.issuePrice > 0) ipo.issuePrice else 100,
+            lotSize = if (ipo.lotSize > 0) ipo.lotSize else 15,
+            boaDate = ipo.boaDate,
+            registrar = detectRegistrarForIpo(ipo.name, ipo.id)
+        )
+        MultiPanAllotmentCheckModalSheet(
+            appliedIpo = summary,
+            panProfiles = panProfiles,
+            existingApplications = existingApplications,
+            onSaveBatchResults = { results ->
+                onSaveBatchAllotmentResults?.invoke(summary, results)
+            },
+            onToggleSinglePanStatus = { pan, newStatus ->
+                onSaveBatchAllotmentResults?.invoke(summary, mapOf(pan to newStatus))
+            },
+            onAddPanProfile = { h, p, d, u, c ->
+                onAddPanProfile?.invoke(h, p, d, u, c)
+            },
+            onOpenOfficialRegistrar = { req ->
+                activeRegistrarRequest = req
+            },
+            onDismiss = { showMultiPanCheckSheet = false },
+            hidePanNumbers = hidePanNumbers,
+            onToggleHidePanNumbers = onToggleHidePanNumbers
+        )
     }
 
     activeRegistrarRequest?.let { req ->

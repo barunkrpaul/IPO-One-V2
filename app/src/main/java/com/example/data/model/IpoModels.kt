@@ -7,10 +7,17 @@ import com.google.firebase.firestore.ServerTimestamp
 
 enum class IpoStatusFilter(val label: String, val code: String) {
     ALL("All Live", "ALL"),
-    OPEN("Open Now", "O"),
+    OPEN("Open", "O"),
     UPCOMING("Upcoming", "U"),
-    CLOSED("Closed / BoA", "C"),
+    CLOSED("Closed", "C"),
+    ALLOTTED("Allotted", "A"),
     LISTED("Listed", "L")
+}
+
+fun maskPanNumber(pan: String, hidePan: Boolean): String {
+    val clean = pan.trim().uppercase()
+    if (!hidePan || clean.length < 6) return clean
+    return "${clean.take(3)}****${clean.takeLast(2)}"
 }
 
 enum class IpoBoardFilter(val label: String) {

@@ -185,6 +185,37 @@ class IpoFirestoreRepository(
         }
     }
 
+    suspend fun updatePanProfile(
+        panId: String,
+        holderName: String,
+        panNumber: String,
+        dematId: String,
+        upiId: String,
+        category: String
+    ): Result<Unit> {
+        val uid = requireUserId()
+        val docRef = db.collection("users").document(uid).collection("pan_profiles").document(panId)
+        return try {
+            val validCat = if (category in listOf("Retail", "sHNI", "bHNI")) category else "Retail"
+            docRef.update(
+                mapOf(
+                    "holderName" to holderName.trim().take(80),
+                    "panNumber" to panNumber.trim().uppercase().padEnd(10, 'X').take(10),
+                    "dematId" to dematId.trim().ifBlank { "1208160000000001" }.take(32),
+                    "upiId" to upiId.trim().ifBlank { "investor@upi" }.take(80),
+                    "category" to validCat,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, docRef.path)
+            Result.failure(e)
+        }
+    }
+
     suspend fun deletePanProfile(panId: String): Result<Unit> {
         val uid = requireUserId()
         val docRef = db.collection("users").document(uid).collection("pan_profiles").document(panId)
@@ -267,6 +298,26 @@ class IpoFirestoreRepository(
             docRef.update(
                 mapOf(
                     "status" to newStatus,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, docRef.path)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun requestNewMandate(appId: String, newUpiId: String): Result<Unit> {
+        val uid = requireUserId()
+        val docRef = db.collection("users").document(uid).collection("applications").document(appId)
+        return try {
+            docRef.update(
+                mapOf(
+                    "upiId" to newUpiId.trim().ifBlank { "investor@upi" }.take(80),
+                    "status" to "Mandate Pending",
                     "updatedAt" to FieldValue.serverTimestamp()
                 )
             ).await()

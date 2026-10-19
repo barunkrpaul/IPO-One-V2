@@ -52,6 +52,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
+import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Add
+import com.example.data.model.PanProfile
 import com.example.data.model.UserProfile
 import com.example.util.BiometricAuthHelper
 
@@ -63,7 +66,9 @@ fun SecuritySettingsScreen(
     onToggleBiometric: (Boolean) -> Unit,
     onLockAppNow: () -> Unit,
     onUpdateMobilePhone: (String) -> Unit,
-    onSignOut: () -> Unit
+    onSignOut: () -> Unit,
+    panProfiles: List<PanProfile> = emptyList(),
+    onOpenAddPanModal: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val activity = context as? FragmentActivity
@@ -241,6 +246,58 @@ fun SecuritySettingsScreen(
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Post-Login Saved PAN Cards Card inside Profile / Security
+        if (onOpenAddPanModal != null) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.AccountBalanceWallet,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Saved PAN Cards (${panProfiles.size})",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "Used for 1-click multi-PAN allotment status check",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Button(
+                                onClick = onOpenAddPanModal,
+                                modifier = Modifier.testTag("profile_add_pan_button")
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Add PAN")
                             }
                         }
                     }
