@@ -18,11 +18,7 @@ jobs:
           def note(t): print("::notice::"+t.replace("\n"," ")[:3900])
           for f in ["page.html","sme.html"]:
               h=open(f).read().replace('\\"','"')
-              infos=sorted(set(re.findall(r'"([a-zA-Z_]{3,40})":\[\{',h)))
-              note(f+" arrays="+",".join(infos))
-              for kw in ['"leadManager','"lead_manager_name','"lm_name','"marketMaker','"market_maker_name','tonbo-imaging-india-ltd-logo','acme','"nse_symbol','"nse_script','"symbol"']:
-                  for m in list(re.finditer(re.escape(kw),h))[:1]:
-                      note(f+" "+kw+": "+h[max(0,m.start()-200):m.start()+500])
-              for m in list(re.finditer(r'https?://[^"\s]*logo[^"\s]*',h))[:3]:
-                  note(f+" logo url: "+m.group(0))
+              for kw in ['"ipoLeadManagersList":[','"ipoBiddingData":[','"market_maker_id"','Market Maker']:
+                  for m in list(re.finditer(re.escape(kw),h))[:2]:
+                      note(f+" "+kw+": "+h[m.start():m.start()+1500])
           PY
