@@ -8,6 +8,11 @@ import com.example.data.model.CalendarEvent
 import com.example.data.model.IpoBoardFilter
 import com.example.data.model.IpoExtras
 import com.example.data.model.IpoLifecycleStage
+import com.example.data.model.ListedIpoRecord
+import com.example.data.model.ListingPerformance
+import com.example.data.model.listingPerformance
+import com.example.data.model.listingYears
+import com.example.data.model.sortListedHistory
 import com.example.data.model.IpoStatusFilter
 import com.example.data.model.LiveIpoItem
 import com.example.data.model.PanProfile
@@ -28,11 +33,25 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.YearMonth
 
 sealed interface UiState<out T> {
     data object Loading : UiState<Nothing>
     data class Success<T>(val data: T) : UiState<T>
     data class Error(val message: String) : UiState<Nothing>
+}
+
+/** What the dashboard's Listed section shows from the listed-IPO history. */
+data class ListedHistoryView(
+    val isLoading: Boolean = true,
+    val error: String? = null,
+    val records: List<ListedIpoRecord> = emptyList(),
+    val totalMatching: Int = 0,
+    val years: List<Int> = emptyList(),
+    val selectedYear: Int? = null,
+    val monthPerformance: ListingPerformance? = null
+) {
+    val canLoadMore: Boolean get() = records.size < totalMatching
 }
 
 enum class IpoSortOption(val label: String) {
@@ -58,16 +77,44 @@ class IpoViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
-    val liveIposState: StateFlow<UiState<List<LiveIpoItem>>> = combine(
-        _liveIposState,
+    private val _listedHistory = MutableStateFlow<UiState<List<ListedIpoRecord>>>(UiState.Loading)
+
+    /** Listed-IPO history with ipo_extras corporate-action adjustments, newest first. */
+    val listedHistoryState: StateFlow<UiState<List<ListedIpoRecord>>> = combine(
+        _listedHistory,
         ipoExtrasState
     ) { state, extras ->
-        if (state is UiState.Success && extras.isNotEmpty()) {
-            UiState.Success(state.data.map { it.withExtras(extras[it.id]) })
+        if (state is UiState.Success) {
+            UiState.Success(sortListedHistory(state.data.map { it.withExtras(extras[it.id]) }))
         } else {
             state
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, UiState.Loading)
+
+    val liveIposState: StateFlow<UiState<List<LiveIpoItem>>> = combine(
+        _liveIposState,
+        ipoExtrasState,
+        listedHistoryState
+    ) { state, extras, history ->
+        if (state !is UiState.Success) return@combine state
+        // Current market price for recently listed IPOs comes from the history report
+        val ltpById = (history as? UiState.Success)?.data
+            ?.associate { it.id to it.currentPrice }
+            .orEmpty()
+        UiState.Success(
+            state.data.map { item ->
+                val merged = item.withExtras(extras[item.id])
+                if (merged.currentPrice == null && ltpById[item.id] != null) {
+                    merged.copy(currentPrice = ltpById[item.id])
+                } else {
+                    merged
+                }
+            }
+        )
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, UiState.Loading)
+
+    private val _listedYearFilter = MutableStateFlow<Int?>(null)
+    private val _listedVisibleCount = MutableStateFlow(LISTED_PAGE_SIZE)
 
     /** All dated IPO milestones (including estimated ones) for the calendar and today's strip. */
     val calendarEventsState: StateFlow<List<CalendarEvent>> = combine(
@@ -213,11 +260,82 @@ class IpoViewModel(
         initialValue = UiState.Loading
     )
 
+    val listedHistoryView: StateFlow<ListedHistoryView> = combine(
+        listedHistoryState,
+        combine(_boardFilter, _statusFilter, _searchQuery) { board, status, query -> Triple(board, status, query) },
+        combine(_onlyWatchlist, watchlistState) { onlyWatch, wState ->
+            onlyWatch to ((wState as? UiState.Success)?.data?.map { it.ipoId }?.toSet() ?: emptySet())
+        },
+        combine(_listedYearFilter, _listedVisibleCount) { year, count -> year to count },
+        _liveIposState
+    ) { historyState, (board, status, query), (onlyWatch, watchedIds), (year, visibleCount), liveState ->
+        when (historyState) {
+            is UiState.Loading -> ListedHistoryView(isLoading = true, selectedYear = year)
+            is UiState.Error -> ListedHistoryView(isLoading = false, error = historyState.message, selectedYear = year)
+            is UiState.Success -> {
+                // Listings still in the live feed are already shown as full cards
+                val liveIds = (liveState as? UiState.Success)?.data?.map { it.id }?.toSet().orEmpty()
+                val boardFiltered = historyState.data.filter { record ->
+                    when (board) {
+                        IpoBoardFilter.ALL -> true
+                        IpoBoardFilter.MAINBOARD -> record.category == "Mainboard"
+                        IpoBoardFilter.SME -> record.category == "SME"
+                    }
+                }
+                val showHistory = status == IpoStatusFilter.ALL || status == IpoStatusFilter.LISTED
+                val matching = if (!showHistory) emptyList() else boardFiltered.filter { record ->
+                    record.id !in liveIds &&
+                        (year == null || record.listingDate?.year == year) &&
+                        (query.isBlank() ||
+                            record.name.contains(query, ignoreCase = true) ||
+                            record.symbol.contains(query, ignoreCase = true)) &&
+                        (!onlyWatch || record.id in watchedIds)
+                }
+                ListedHistoryView(
+                    isLoading = false,
+                    records = matching.take(visibleCount),
+                    totalMatching = matching.size,
+                    years = listingYears(historyState.data),
+                    selectedYear = year,
+                    monthPerformance = listingPerformance(boardFiltered, YearMonth.now())
+                )
+            }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), ListedHistoryView())
+
     init {
         refreshLiveInvestorGainData()
     }
 
+    fun setListedYearFilter(year: Int?) {
+        _listedYearFilter.value = year
+        _listedVisibleCount.value = LISTED_PAGE_SIZE
+    }
+
+    fun loadMoreListed() {
+        _listedVisibleCount.value += LISTED_PAGE_SIZE
+    }
+
+    private fun refreshListedHistory() {
+        viewModelScope.launch {
+            if (_listedHistory.value !is UiState.Success) _listedHistory.value = UiState.Loading
+            investorGainClient.fetchListedHistory().fold(
+                onSuccess = { _listedHistory.value = UiState.Success(it) },
+                onFailure = { err ->
+                    Log.w(TAG, "Failed to fetch listed IPO history", err)
+                    // Keep showing the last good copy if there is one
+                    if (_listedHistory.value !is UiState.Success) {
+                        _listedHistory.value = UiState.Error(
+                            err.localizedMessage ?: "Failed to load listed IPO history"
+                        )
+                    }
+                }
+            )
+        }
+    }
+
     fun refreshLiveInvestorGainData() {
+        refreshListedHistory()
         viewModelScope.launch {
             _liveIposState.value = UiState.Loading
             val result = investorGainClient.fetchLiveIpos()
@@ -678,5 +796,6 @@ class IpoViewModel(
 
     companion object {
         private const val TAG = "IpoViewModel"
+        private const val LISTED_PAGE_SIZE = 20
     }
 }

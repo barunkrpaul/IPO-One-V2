@@ -1,6 +1,11 @@
 package com.example.data.remote
 
+import com.example.data.model.IpoDates
+import com.example.data.model.ListedIpoRecord
 import com.example.data.model.LiveIpoItem
+import com.example.data.model.parseListingPriceFromNameCell
+import com.example.data.model.parsePriceAndPercent
+import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
@@ -117,6 +122,10 @@ class InvestorGainClient(
 
                 val sortOpenDate = row.optString("~Srt_Open", "")
                 val sortCloseDate = row.optString("~Srt_Close", "")
+                val sortBoaDate = row.optString("~Srt_BoA_Dt", "")
+                val sortListingDate = row.optString("~Str_Listing", "")
+                // Listed rows carry "L@221.00 (12.76%)" in the name cell
+                val listingPrice = parseListingPriceFromNameCell(row.optString("Name", ""))
                 val updatedOn = stripHtml(row.optString("Updated-On", "Live")).trim().ifEmpty { "Live" }
                 val hasAnchor = row.optString("Anchor", "").contains("✅")
 
@@ -184,7 +193,10 @@ class InvestorGainClient(
                         sortCloseDate = sortCloseDate,
                         updatedOn = updatedOn,
                         hasAnchor = hasAnchor,
-                        investorGainUrl = investorGainUrl
+                        investorGainUrl = investorGainUrl,
+                        listingPrice = listingPrice,
+                        sortBoaDate = sortBoaDate,
+                        sortListingDate = sortListingDate
                     )
                 )
             }
@@ -195,6 +207,56 @@ class InvestorGainClient(
             items
         }
     }
+
+    /**
+     * Listed IPOs with listing and current (LTP) performance, from report 377.
+     * The report returns every recent listing in one response.
+     */
+    suspend fun fetchListedHistory(): Result<List<ListedIpoRecord>> = withContext(Dispatchers.IO) {
+        runCatching {
+            val cal = Calendar.getInstance()
+            val month = cal.get(Calendar.MONTH) + 1
+            val year = cal.get(Calendar.YEAR)
+            val fyStart = if (month >= 4) year else year - 1
+            val fy = String.format("%d-%02d", fyStart, (fyStart + 1) % 100)
+            val rows = fetchReportTable(377, month, year, fy)
+            val today = LocalDate.now()
+            val records = mutableListOf<ListedIpoRecord>()
+            for (i in 0 until rows.length()) {
+                val row = rows.optJSONObject(i) ?: continue
+                val id = row.opt("~id")?.toString()?.trim().orEmpty()
+                val name = decodeHtmlEntities(stripHtml(row.optString("IPO", "").substringBefore("<span"))).trim()
+                if (id.isEmpty() || name.isEmpty()) continue
+
+                val (issuePrice, _) = parsePriceAndPercent(row.optString("Price", ""))
+                val (listingPrice, listingPctFromCell) = parsePriceAndPercent(row.optString("Listing Price", ""))
+                val (currentPrice, currentPctFromCell) = parsePriceAndPercent(row.optString("Closing Price (LTP)", ""))
+                val listingDate = IpoDates.parse(row.optString("Listing Dt", ""), today)
+                    ?: IpoDates.parse(row.optString("~orderby", "").take(10), today)
+                val folderPath = row.optString("~URLRewrite_Folder_Name", "")
+
+                records.add(
+                    ListedIpoRecord(
+                        id = id,
+                        name = name,
+                        symbol = stripHtml(row.optString("Symbol", "")).trim(),
+                        category = if (row.optString("~IPO_Category", "").contains("SME", ignoreCase = true)) "SME" else "Mainboard",
+                        issuePrice = issuePrice ?: 0.0,
+                        listingPrice = listingPrice,
+                        listingGainPct = row.optNumberOrNull("~str_listing_gain_in_per") ?: listingPctFromCell,
+                        currentPrice = currentPrice,
+                        currentGainPct = row.optNumberOrNull("~str_ltp_per_calc") ?: currentPctFromCell,
+                        listingDate = listingDate,
+                        url = if (folderPath.isBlank()) "" else "https://www.investorgain.com/${folderPath.trimStart('/')}"
+                    )
+                )
+            }
+            records
+        }
+    }
+
+    private fun JSONObject.optNumberOrNull(key: String): Double? =
+        if (isNull(key)) null else opt(key)?.toString()?.trim()?.toDoubleOrNull()
 
     private fun fetchReportTable(reportId: Int, month: Int, year: Int, fy: String) =
         fetchReportTableInternal("$BASE_API/report/data-read/$reportId/1/$month/$year/$fy/0/all?search=")

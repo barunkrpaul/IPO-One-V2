@@ -30,6 +30,15 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Refresh
@@ -79,6 +88,11 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.FactCheck
 import androidx.annotation.StringRes
 import com.example.data.model.CalendarEvent
+import com.example.data.model.ListedIpoRecord
+import com.example.data.model.ListingPerformance
+import com.example.data.model.listingLocalDate
+import com.example.ui.viewmodel.ListedHistoryView
+import java.time.YearMonth
 import com.example.data.model.IpoBoardFilter
 import com.example.data.model.IpoLifecycleStage
 import com.example.data.model.IpoDates
@@ -122,7 +136,10 @@ fun MainDashboardScreen(
     hidePanNumbers: Boolean = false,
     todayEvents: List<CalendarEvent> = emptyList(),
     onViewCalendar: (() -> Unit)? = null,
-    onOpenIpoById: ((String) -> Unit)? = null
+    onOpenIpoById: ((String) -> Unit)? = null,
+    listedHistory: ListedHistoryView = ListedHistoryView(isLoading = false),
+    onListedYearChange: (Int?) -> Unit = {},
+    onLoadMoreListed: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var sortMenuExpanded by remember { mutableStateOf(false) }
@@ -564,7 +581,26 @@ fun MainDashboardScreen(
 
             is UiState.Success -> {
                 val ipos = filteredIposState.data
-                if (ipos.isEmpty()) {
+                val historyVisible = (statusFilter == IpoStatusFilter.ALL || statusFilter == IpoStatusFilter.LISTED) &&
+                    (listedHistory.isLoading || listedHistory.error != null || listedHistory.totalMatching > 0)
+                val selectedYear = listedHistory.selectedYear
+                // Live listed cards honour the year filter too
+                val sections = groupByLifecycleStage(ipos, today)
+                    .map { (stage, list) ->
+                        if (stage == IpoLifecycleStage.LISTED && selectedYear != null) {
+                            stage to list.filter { it.listingLocalDate(today)?.year == selectedYear }
+                        } else {
+                            stage to list
+                        }
+                    }
+                    .let { list ->
+                        if (historyVisible && list.none { it.first == IpoLifecycleStage.LISTED }) {
+                            (list + (IpoLifecycleStage.LISTED to emptyList())).sortedBy { it.first.ordinal }
+                        } else {
+                            list
+                        }
+                    }
+                if (sections.isEmpty()) {
                     item {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
@@ -598,13 +634,13 @@ fun MainDashboardScreen(
                         }
                     }
                 } else {
-                    val sections = groupByLifecycleStage(ipos, today)
                     sections.forEach { (stage, stageIpos) ->
                         val expanded = stage.name !in collapsedStages
+                        val isListed = stage == IpoLifecycleStage.LISTED
                         item(key = "section_${stage.name}") {
                             StageSectionHeader(
                                 stage = stage,
-                                count = stageIpos.size,
+                                count = stageIpos.size + if (isListed && historyVisible) listedHistory.totalMatching else 0,
                                 expanded = expanded,
                                 onToggle = {
                                     collapsedStages = if (expanded) {
@@ -614,6 +650,22 @@ fun MainDashboardScreen(
                                     }
                                 }
                             )
+                        }
+                        if (expanded && isListed) {
+                            listedHistory.monthPerformance?.takeIf { it.count > 0 }?.let { perf ->
+                                item(key = "listed_performance") {
+                                    ListingPerformanceCard(performance = perf, month = YearMonth.from(today))
+                                }
+                            }
+                            if (listedHistory.years.isNotEmpty()) {
+                                item(key = "listed_years") {
+                                    ListedYearChips(
+                                        years = listedHistory.years,
+                                        selected = selectedYear,
+                                        onChange = onListedYearChange
+                                    )
+                                }
+                            }
                         }
                         if (expanded) {
                             items(stageIpos, key = { it.id }) { ipo ->
@@ -629,6 +681,28 @@ fun MainDashboardScreen(
                                     onCheckAllotment = if (onCheckAllotmentForIpo != null) {
                                         { onCheckAllotmentForIpo(ipo) }
                                     } else null
+                                )
+                            }
+                        }
+                        if (expanded && isListed && historyVisible) {
+                            items(listedHistory.records, key = { "history_${it.id}" }) { record ->
+                                ListedHistoryCard(
+                                    record = record,
+                                    today = today,
+                                    onClick = {
+                                        if (record.url.isNotBlank()) {
+                                            runCatching {
+                                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(record.url)))
+                                            }
+                                        }
+                                    }
+                                )
+                            }
+                            item(key = "listed_history_footer") {
+                                ListedHistoryFooter(
+                                    view = listedHistory,
+                                    onLoadMore = onLoadMoreListed,
+                                    onRetry = onRefresh
                                 )
                             }
                         }
@@ -1223,6 +1297,316 @@ private fun TodayEventsStrip(
                     }
                 }
             }
+        }
+    }
+}
+
+private val MonthYearFormat = java.time.format.DateTimeFormatter.ofPattern("MMMM yyyy", java.util.Locale.ENGLISH)
+private val ListedDateFormat = java.time.format.DateTimeFormatter.ofPattern("EEE, d MMM yyyy", java.util.Locale.ENGLISH)
+
+@Composable
+private fun ListingPerformanceCard(performance: ListingPerformance, month: YearMonth) {
+    val dash = stringResource(R.string.value_unavailable)
+    fun pctColor(pct: Double?) = when {
+        pct == null -> null
+        pct > 0 -> GainGreen
+        pct < 0 -> LossRed
+        else -> null
+    }
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("listing_performance_card"),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        )
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Text(
+                text = stringResource(R.string.listed_perf_title, month.format(MonthYearFormat)),
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(modifier = Modifier.fillMaxWidth()) {
+                PerformanceStat(
+                    label = stringResource(R.string.listed_perf_count),
+                    value = performance.count.toString(),
+                    modifier = Modifier.weight(1f)
+                )
+                PerformanceStat(
+                    label = stringResource(R.string.listed_perf_avg),
+                    value = performance.averageListingGainPct?.let { formatSignedPercent(it) } ?: dash,
+                    valueColor = pctColor(performance.averageListingGainPct),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(modifier = Modifier.fillMaxWidth()) {
+                PerformanceStat(
+                    label = stringResource(R.string.listed_perf_best),
+                    value = performance.best?.let {
+                        stringResource(R.string.listed_perf_entry, it.name, formatSignedPercent(it.listingGainPct ?: 0.0))
+                    } ?: dash,
+                    valueColor = pctColor(performance.best?.listingGainPct),
+                    modifier = Modifier.weight(1f)
+                )
+                PerformanceStat(
+                    label = stringResource(R.string.listed_perf_worst),
+                    value = performance.worst?.let {
+                        stringResource(R.string.listed_perf_entry, it.name, formatSignedPercent(it.listingGainPct ?: 0.0))
+                    } ?: dash,
+                    valueColor = pctColor(performance.worst?.listingGainPct),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PerformanceStat(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    valueColor: Color? = null
+) {
+    Column(modifier = modifier.padding(end = 8.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+            color = valueColor ?: MaterialTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun ListedYearChips(years: List<Int>, selected: Int?, onChange: (Int?) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .testTag("listed_year_chips"),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        FilterChip(
+            selected = selected == null,
+            onClick = { onChange(null) },
+            label = { Text(stringResource(R.string.listed_year_all)) },
+            colors = FilterChipDefaults.filterChipColors(
+                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                selectedLabelColor = MaterialTheme.colorScheme.primary
+            )
+        )
+        years.forEach { year ->
+            FilterChip(
+                selected = selected == year,
+                onClick = { onChange(year) },
+                label = { Text(year.toString()) },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    selectedLabelColor = MaterialTheme.colorScheme.primary
+                ),
+                modifier = Modifier.testTag("listed_year_$year")
+            )
+        }
+    }
+}
+
+@Composable
+private fun ListedHistoryCard(record: ListedIpoRecord, today: LocalDate, onClick: () -> Unit) {
+    val neutral = MaterialTheme.colorScheme.onSurfaceVariant
+    fun gainColor(pct: Double?) = when {
+        pct == null -> neutral
+        pct > 0 -> GainGreen
+        pct < 0 -> LossRed
+        else -> neutral
+    }
+    val dash = stringResource(R.string.value_unavailable)
+    val issuedText = stringResource(R.string.listed_issued, formatInr(record.issuePrice))
+    val listedText = record.listingPrice?.let {
+        stringResource(R.string.listed_listed, formatInr(it), record.listingGainPct?.let(::formatSignedPercent) ?: dash)
+    }
+    val nowText = record.currentPrice?.let {
+        stringResource(R.string.listed_now, formatInr(it), record.currentGainPct?.let(::formatSignedPercent) ?: dash)
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .testTag("listed_history_${record.id}"),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = record.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = listOfNotNull(
+                            record.symbol.takeIf { it.isNotBlank() },
+                            record.listingDate?.let { stringResource(R.string.listed_on, it.format(ListedDateFormat)) }
+                        ).joinToString("  ·  "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Surface(
+                    color = if (record.category == "Mainboard") MaterialTheme.colorScheme.primaryContainer
+                    else MaterialTheme.colorScheme.secondaryContainer,
+                    shape = RoundedCornerShape(6.dp)
+                ) {
+                    Text(
+                        text = record.category,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (record.category == "Mainboard") MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = buildAnnotatedString {
+                        withStyle(SpanStyle(color = neutral)) { append(issuedText) }
+                        if (listedText != null) {
+                            append("  →  ")
+                            withStyle(SpanStyle(color = gainColor(record.listingGainPct), fontWeight = FontWeight.Bold)) {
+                                append(listedText)
+                            }
+                        }
+                        if (nowText != null) {
+                            append("  →  ")
+                            withStyle(SpanStyle(color = gainColor(record.currentGainPct), fontWeight = FontWeight.Bold)) {
+                                append(nowText)
+                            }
+                        }
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (nowText != null) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    if (record.adjusted) {
+                        AdjustedTag(corporateAction = record.corporateAction.orEmpty())
+                    } else {
+                        RawPriceInfo()
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AdjustedTag(corporateAction: String) {
+    val state = rememberTooltipState(isPersistent = true)
+    val scope = rememberCoroutineScope()
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = { PlainTooltip { Text(stringResource(R.string.listed_adjusted_info, corporateAction)) } },
+        state = state
+    ) {
+        Surface(
+            color = MaterialTheme.colorScheme.tertiaryContainer,
+            shape = RoundedCornerShape(6.dp),
+            modifier = Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .clickable { scope.launch { state.show() } }
+        ) {
+            Text(
+                text = stringResource(R.string.listed_adjusted),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RawPriceInfo() {
+    val state = rememberTooltipState(isPersistent = true)
+    val scope = rememberCoroutineScope()
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = { PlainTooltip { Text(stringResource(R.string.listed_raw_price_info)) } },
+        state = state
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Info,
+            contentDescription = stringResource(R.string.listed_raw_price_cd),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .size(18.dp)
+                .clip(CircleShape)
+                .clickable { scope.launch { state.show() } }
+        )
+    }
+}
+
+@Composable
+private fun ListedHistoryFooter(view: ListedHistoryView, onLoadMore: () -> Unit, onRetry: () -> Unit) {
+    when {
+        view.isLoading -> Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = stringResource(R.string.listed_history_loading),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        view.error != null -> Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = stringResource(R.string.listed_history_error),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(onClick = onRetry, modifier = Modifier.testTag("listed_history_retry")) {
+                Text(stringResource(R.string.listed_history_retry))
+            }
+        }
+
+        view.canLoadMore -> OutlinedButton(
+            onClick = onLoadMore,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("listed_load_more"),
+            shape = RoundedCornerShape(14.dp)
+        ) {
+            Text(stringResource(R.string.listed_load_more, view.totalMatching - view.records.size))
         }
     }
 }

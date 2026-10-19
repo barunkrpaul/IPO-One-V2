@@ -203,6 +203,7 @@ fun MainAppContent(
     val ipoExtras by viewModel.ipoExtrasState.collectAsStateWithLifecycle()
     val lastLiveRefreshMillis by viewModel.lastLiveRefreshMillis.collectAsStateWithLifecycle()
     val calendarEvents by viewModel.calendarEventsState.collectAsStateWithLifecycle()
+    val listedHistory by viewModel.listedHistoryView.collectAsStateWithLifecycle()
     val todayEvents = remember(calendarEvents) { eventsOn(calendarEvents, java.time.LocalDate.now()) }
 
     val userProfile = (userProfileState as? UiState.Success)?.data
@@ -490,7 +491,10 @@ fun MainAppContent(
                         calendarFocusDate = java.time.LocalDate.now()
                         currentTab = 3
                     },
-                    onOpenIpoById = openIpoById
+                    onOpenIpoById = openIpoById,
+                    listedHistory = listedHistory,
+                    onListedYearChange = viewModel::setListedYearFilter,
+                    onLoadMoreListed = viewModel::loadMoreListed
                 )
 
                 3 -> IpoCalendarScreen(

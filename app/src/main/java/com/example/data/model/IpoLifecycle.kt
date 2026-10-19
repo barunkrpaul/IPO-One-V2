@@ -46,7 +46,9 @@ data class IpoExtras(
     val registrar: String? = null,
     val marketMaker: String? = null,
     val subscription: Map<SubscriptionCategory, SubscriptionFigures> = emptyMap(),
-    val subscriptionUpdatedAtMillis: Long? = null
+    val subscriptionUpdatedAtMillis: Long? = null,
+    val corporateAction: String? = null,
+    val adjustedCurrentPrice: Double? = null
 ) {
     companion object {
         fun fromMap(data: Map<String, Any?>): IpoExtras {
@@ -83,7 +85,9 @@ data class IpoExtras(
                     is java.util.Date -> v.time
                     is Number -> v.toLong()
                     else -> null
-                }
+                },
+                corporateAction = data["corporateAction"].asText(),
+                adjustedCurrentPrice = data["adjustedCurrentPrice"].asDouble()
             )
         }
 
@@ -139,6 +143,7 @@ object IpoDates {
         formatter("d-M-yyyy"),
         formatter("d/M/yyyy"),
         formatter("d-MMM-yyyy"),
+        formatter("d-MMM-yy"),
         formatter("d MMM yyyy"),
         formatter("d MMM, yyyy"),
         formatter("MMM d, yyyy"),
@@ -197,10 +202,10 @@ fun LiveIpoItem.closeLocalDate(today: LocalDate): LocalDate? =
     IpoDates.parse(sortCloseDate, today) ?: IpoDates.parse(closeDate, openLocalDate(today) ?: today)
 
 fun LiveIpoItem.allotmentLocalDate(today: LocalDate): LocalDate? =
-    IpoDates.parse(boaDate, closeLocalDate(today) ?: today)
+    IpoDates.parse(sortBoaDate, today) ?: IpoDates.parse(boaDate, closeLocalDate(today) ?: today)
 
 fun LiveIpoItem.listingLocalDate(today: LocalDate): LocalDate? =
-    IpoDates.parse(listingDate, closeLocalDate(today) ?: today)
+    IpoDates.parse(sortListingDate, today) ?: IpoDates.parse(listingDate, closeLocalDate(today) ?: today)
 
 /** Stage implied by the InvestorGain status code alone, or null for unknown codes. */
 fun stageFromStatusCode(statusCode: String): IpoLifecycleStage? {

@@ -130,4 +130,22 @@
     <string name="today_events_title">Today\'s events</string>
     <string name="today_events_view_calendar">View in calendar</string>
     <string name="today_event_chip">%1$s · %2$s</string>
+
+    <!-- Listed history -->
+    <string name="listed_perf_title">Listing performance · %1$s</string>
+    <string name="listed_perf_count">Listed</string>
+    <string name="listed_perf_avg">Avg listing gain</string>
+    <string name="listed_perf_best">Best</string>
+    <string name="listed_perf_worst">Worst</string>
+    <string name="listed_perf_entry">%1$s (%2$s)</string>
+    <string name="listed_year_all">All years</string>
+    <string name="listed_load_more">Load more (%1$d left)</string>
+    <string name="listed_history_loading">Loading listed IPO history…</string>
+    <string name="listed_history_error">Could not load listed IPO history.</string>
+    <string name="listed_history_retry">Retry</string>
+    <string name="listed_on">Listed %1$s</string>
+    <string name="listed_adjusted">adjusted</string>
+    <string name="listed_adjusted_info">Current price adjusted for %1$s.</string>
+    <string name="listed_raw_price_info">Current price is not adjusted for splits or bonus issues, so the gain may be misleading after one.</string>
+    <string name="listed_raw_price_cd">About the current price</string>
 </resources>

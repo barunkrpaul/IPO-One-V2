@@ -66,7 +66,10 @@ data class LiveIpoItem(
     val preApplyOpen: Boolean? = null,
     val listingPrice: Double? = null,
     val currentPrice: Double? = null,
-    val cancelled: Boolean? = null
+    val cancelled: Boolean? = null,
+    // ISO dates from the feed's ~Srt_BoA_Dt / ~Str_Listing columns
+    val sortBoaDate: String = "",
+    val sortListingDate: String = ""
 )
 
 @IgnoreExtraProperties
