@@ -39,7 +39,24 @@ jobs:
             base64 -d app/google-services.json.b64 > app/google-services.json
           fi
 
+      - name: Restore release signing key
+        env:
+          RELEASE_KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_B64 }}
+        run: |
+          # Optional: without this secret the release APK is signed with the debug key
+          if [ -n "$RELEASE_KEYSTORE_B64" ]; then
+            echo "$RELEASE_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "RELEASE_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+            echo "Release key found; signing the release APK with it."
+          else
+            echo "No RELEASE_KEYSTORE_B64 secret; the release APK uses the debug key."
+          fi
+
       - name: Build Signed APKs
+        env:
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
           gradle assembleDebug assembleRelease -x lint -x lintVitalRelease -Dorg.gradle.jvmargs="-Xmx4096m -Dfile.encoding=UTF-8"
           cp app/build/outputs/apk/release/app-release.apk IPO-One.apk
