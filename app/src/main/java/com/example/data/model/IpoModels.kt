@@ -95,6 +95,9 @@ data class PanProfile(
     val dematId: String = "",
     val upiId: String = "",
     val category: String = "Retail",
+    // Optional: which broker this PAN applies through and its client ID (never a password)
+    val broker: String = "",
+    val brokerClientId: String = "",
     @ServerTimestamp val createdAt: Timestamp? = null,
     @ServerTimestamp val updatedAt: Timestamp? = null
 )

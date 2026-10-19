@@ -454,7 +454,7 @@ fun RegistrarVerificationModalSheet(
                                     Button(
                                         onClick = {
                                             webViewRef?.evaluateJavascript(
-                                                buildRegistrarFillJs(request.panNumber, request.ipoName, autoSubmit = false)
+                                                buildRegistrarFillJs(request.panNumber, request.ipoName, autoSubmit = true)
                                             ) {
                                                 autoFillStatus =
                                                     "PAN ${request.panNumber.uppercase()} injected into ${activeRegistrar.shortName} form!"
@@ -547,7 +547,7 @@ fun RegistrarVerificationModalSheet(
                                     pageProgress = 100
                                     if (request.panNumber.isNotBlank()) {
                                         view?.evaluateJavascript(
-                                            buildRegistrarFillJs(request.panNumber, request.ipoName, autoSubmit = false)
+                                            buildRegistrarFillJs(request.panNumber, request.ipoName, autoSubmit = true)
                                         ) {
                                             autoFillStatus =
                                                 "PAN ${request.panNumber.uppercase()} auto-filled & ready on ${activeRegistrar.shortName}"

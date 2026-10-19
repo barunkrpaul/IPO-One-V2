@@ -687,6 +687,19 @@ class IpoViewModel(
         }
     }
 
+    fun setPanBroker(panId: String, broker: String, brokerClientId: String) {
+        viewModelScope.launch {
+            if (currentUserId == "guest") {
+                _guestPanProfiles.value = _guestPanProfiles.value.map {
+                    if (it.id == panId) it.copy(broker = broker, brokerClientId = brokerClientId.trim()) else it
+                }
+            } else {
+                val res = repository.updatePanBroker(panId, broker, brokerClientId)
+                if (res.isFailure) _statusBanner.value = "Could not save the broker for this PAN"
+            }
+        }
+    }
+
     fun deletePanProfile(panId: String) {
         viewModelScope.launch {
             if (currentUserId == "guest") {

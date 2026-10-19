@@ -126,7 +126,10 @@ fun IpoDetailScreen(
     onCheckAllotmentForAll: (AllotmentRegistrar) -> Unit,
     onSaveAllotmentOutcome: ((com.example.data.model.AllotmentTarget, com.example.data.model.AllotmentOutcome) -> Unit)? = null,
     onTimelineDateClick: ((LocalDate) -> Unit)? = null,
-    onIntermediaryClick: ((IntermediaryRole, String) -> Unit)? = null
+    onIntermediaryClick: ((IntermediaryRole, String) -> Unit)? = null,
+    onSetPanBroker: ((panId: String, broker: String, clientId: String) -> Unit)? = null,
+    onMarkApplied: ((pan: PanProfile, category: String, lots: Int) -> Unit)? = null,
+    onAddPan: () -> Unit = {}
 ) {
     BackHandler(onBack = onBack)
     val context = LocalContext.current
@@ -138,6 +141,7 @@ fun IpoDetailScreen(
         com.example.data.model.applicationsForIpo(ipo, applications)
     }
     var showMyApplications by remember { mutableStateOf(false) }
+    var showApplyAssistant by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -201,6 +205,11 @@ fun IpoDetailScreen(
         ) {
             DetailHeader(ipo = ipo, extras = extras, stage = stage, isSme = isSme)
             DetailMetricGrid(ipo = ipo, extras = extras, isSme = isSme)
+            if (onMarkApplied != null && onSetPanBroker != null &&
+                (stage == IpoLifecycleStage.OPEN || stage == IpoLifecycleStage.UPCOMING)
+            ) {
+                ApplyAssistantEntry(onClick = { showApplyAssistant = true })
+            }
             TimelineCard(
                 entries = ipoTimeline(ipo, extras, today),
                 today = today,
@@ -236,6 +245,22 @@ fun IpoDetailScreen(
                 modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
             )
         }
+    }
+
+    if (showApplyAssistant && onMarkApplied != null && onSetPanBroker != null) {
+        com.example.ui.components.ApplyAssistantSheet(
+            ipo = ipo,
+            panProfiles = panProfiles,
+            applications = applications,
+            hidePanNumbers = hidePanNumbers,
+            onSetBroker = onSetPanBroker,
+            onMarkApplied = onMarkApplied,
+            onAddPan = {
+                showApplyAssistant = false
+                onAddPan()
+            },
+            onDismiss = { showApplyAssistant = false }
+        )
     }
 
     if (showMyApplications) {
@@ -990,6 +1015,41 @@ private fun MyApplicationsSheet(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(stringResource(R.string.my_applications_check_all))
             }
+        }
+    }
+}
+
+@Composable
+private fun ApplyAssistantEntry(onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .testTag("detail_apply_assistant"),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.apply_open),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                Text(
+                    text = stringResource(R.string.apply_open_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                )
+            }
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer
+            )
         }
     }
 }

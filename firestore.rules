@@ -48,6 +48,8 @@ service cloud.firestore {
              data.dematId is string && data.dematId.size() >= 4 && data.dematId.size() <= 32 &&
              data.upiId is string && data.upiId.size() <= 80 &&
              data.category is string && data.category in ['Retail', 'sHNI', 'bHNI'] &&
+             (!('broker' in data) || (data.broker is string && data.broker.size() <= 40)) &&
+             (!('brokerClientId' in data) || (data.brokerClientId is string && data.brokerClientId.size() <= 40)) &&
              isValidTimestamp(data.createdAt) &&
              isValidTimestamp(data.updatedAt);
     }
@@ -121,7 +123,7 @@ service cloud.firestore {
                          isValidId(panId) &&
                          incoming().userId == request.auth.uid &&
                          incoming().keys().hasAll(['userId', 'holderName', 'panNumber', 'dematId', 'upiId', 'category', 'createdAt', 'updatedAt']) &&
-                         incoming().keys().hasOnly(['userId', 'holderName', 'panNumber', 'dematId', 'upiId', 'category', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'holderName', 'panNumber', 'dematId', 'upiId', 'category', 'broker', 'brokerClientId', 'createdAt', 'updatedAt']) &&
                          isValidPanProfile(incoming());
 
         allow update: if isOwner(userId) &&
@@ -129,7 +131,7 @@ service cloud.firestore {
                          isValidPanProfile(incoming()) &&
                          incoming().userId == existing().userId &&
                          incoming().createdAt == existing().createdAt &&
-                         incoming().diff(existing()).affectedKeys().hasOnly(['holderName', 'panNumber', 'dematId', 'upiId', 'category', 'updatedAt']);
+                         incoming().diff(existing()).affectedKeys().hasOnly(['holderName', 'panNumber', 'dematId', 'upiId', 'category', 'broker', 'brokerClientId', 'updatedAt']);
 
         allow delete: if isOwner(userId) && isValidId(panId);
       }

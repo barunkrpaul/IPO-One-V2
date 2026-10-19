@@ -184,7 +184,7 @@
     <string name="runner_busy_retrying">Registrar busy, retrying… (attempt %1$d of %2$d)</string>
     <string name="runner_filling">Filling company and PAN…</string>
     <string name="runner_reading">Submitted. Reading the result…</string>
-    <string name="runner_waiting_for_user">Complete the CAPTCHA (if shown) and submit. The result is read automatically.</string>
+    <string name="runner_waiting_for_user">Type the CAPTCHA shown on the page. It is submitted for you when you pause, and the result is read automatically.</string>
     <string name="runner_retry">Retry</string>
     <string name="runner_skip">Skip</string>
     <string name="runner_mark_allotted">Allotted</string>
@@ -245,4 +245,32 @@
     <string name="settings_security">Security &amp; account</string>
     <string name="nav_sign_in">Sign in</string>
     <string name="settings_security_note">Biometric lock, linked mobile number, sign out</string>
+
+    <!-- Apply assistant -->
+    <string name="apply_open">Apply with my PANs</string>
+    <string name="apply_open_note">Bid through your broker for each saved PAN, with details ready to paste</string>
+    <string name="apply_title">Apply · %1$s</string>
+    <string name="apply_summary">Cut-off %1$s · %2$d shares per lot</string>
+    <string name="apply_note_open">Bids are placed in your broker or bank app. After bidding, approve the UPI mandate in your UPI app before 5 PM on the closing day.</string>
+    <string name="apply_note_upcoming">Bidding has not opened yet. Many brokers accept pre-apply bids; the UPI mandate arrives once the issue opens.</string>
+    <string name="apply_note_closed">Bidding for this IPO is closed.</string>
+    <string name="apply_no_pans">Add your PAN cards to the vault to apply with them.</string>
+    <string name="apply_add_pan">Add PAN</string>
+    <string name="apply_category_unavailable">Lot size or price is not known for this category yet.</string>
+    <string name="apply_lots">%1$d lot(s) · %2$d shares · %3$s</string>
+    <string name="apply_fewer_lots">Fewer lots</string>
+    <string name="apply_more_lots">More lots</string>
+    <string name="apply_field_pan">PAN</string>
+    <string name="apply_field_demat">Demat (BO) ID</string>
+    <string name="apply_field_upi">UPI ID</string>
+    <string name="apply_copy_field">Copy %1$s</string>
+    <string name="apply_copied_field">%1$s copied</string>
+    <string name="apply_copied_details">Application details copied</string>
+    <string name="apply_copied_upi">UPI ID copied for the broker form</string>
+    <string name="apply_broker">Broker for this PAN</string>
+    <string name="apply_client_id">Broker client ID (optional)</string>
+    <string name="apply_save_client_id">Save client ID</string>
+    <string name="apply_copy_all">Copy details</string>
+    <string name="apply_pick_broker">Pick a broker</string>
+    <string name="apply_mark_applied">I have applied · log it</string>
 </resources>

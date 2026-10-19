@@ -23,8 +23,9 @@ data class RegistrarFillReport(
  *  - the company dropdown option that best matches the IPO name,
  *  - the "PAN" radio / search-type option,
  *  - the PAN text field (never a CAPTCHA or OTP field),
- *  - the submit button, clicked only when [autoSubmit] is set and the page has
- *    no CAPTCHA. With a CAPTCHA present the user completes and submits it.
+ *  - the submit button, clicked when [autoSubmit] is set. When a CAPTCHA is
+ *    on screen it is never solved or skipped: the person types it and the
+ *    form is submitted for them once they pause.
  */
 fun buildRegistrarFillJs(pan: String, ipoName: String, autoSubmit: Boolean): String {
     val safePan = pan.uppercase().filter { it.isLetterOrDigit() }.take(10)
@@ -104,18 +105,62 @@ fun buildRegistrarFillJs(pan: String, ipoName: String, autoSubmit: Boolean): Str
             }
             if (target) { target.focus(); setValue(target, pan); out.pan = true; }
 
-            var html = document.documentElement.innerHTML.toLowerCase();
-            out.captcha = /captcha|g-recaptcha|hcaptcha|cf-turnstile/.test(html);
-
-            if (autoSubmit && out.pan && !out.captcha) {
-              var buttons = document.querySelectorAll('button, input[type=submit], input[type=button], a.btn');
+            // A CAPTCHA counts only when one is actually on screen; the word in scripts is ignored
+            function visibleCaptcha() {
+              var fields = document.querySelectorAll('input');
+              for (var c = 0; c < fields.length; c++) {
+                if (visible(fields[c]) && /captcha|security code|verification code|enter code|image code/.test(meta(fields[c]))) return fields[c];
+              }
+              var widgets = document.querySelectorAll('img, iframe, canvas, .g-recaptcha, .h-captcha, .cf-turnstile');
+              for (var w = 0; w < widgets.length; w++) {
+                var wd = widgets[w];
+                var sig = ((wd.src || '') + ' ' + (wd.id || '') + ' ' + (wd.alt || '') + ' ' +
+                  (typeof wd.className === 'string' ? wd.className : '')).toLowerCase();
+                if (visible(wd) && /captcha|recaptcha|turnstile/.test(sig)) return wd;
+              }
+              return null;
+            }
+            function findSubmit() {
+              var scope = (target && target.form) || document;
+              var buttons = scope.querySelectorAll('button, input[type=submit], input[type=button], input[type=image], [role=button], a.btn');
               for (var b = 0; b < buttons.length; b++) {
                 var bt = buttons[b];
-                if (!visible(bt)) continue;
-                var text = ((bt.innerText || bt.value || '') + ' ' + (bt.id || '')).toLowerCase();
-                if (/submit|search|check|get|show|\bgo\b/.test(text) && !/reset|clear|cancel|back/.test(text)) {
-                  bt.click(); out.submitted = true; break;
-                }
+                if (!visible(bt) || bt.disabled) continue;
+                var text = ((bt.innerText || bt.value || bt.alt || '') + ' ' + (bt.id || '') + ' ' + (bt.name || '')).toLowerCase();
+                if (/submit|search|check|get|show|\bgo\b|proceed|view|status|fetch|find/.test(text) &&
+                    !/reset|clear|cancel|back|refresh|reload|download|print/.test(text)) return bt;
+              }
+              return null;
+            }
+            function submitNow() {
+              var bt = findSubmit();
+              if (bt) { bt.click(); return true; }
+              if (target && target.form) {
+                if (target.form.requestSubmit) target.form.requestSubmit(); else target.form.submit();
+                return true;
+              }
+              return false;
+            }
+
+            var captcha = visibleCaptcha();
+            out.captcha = !!captcha;
+            if (autoSubmit && out.pan && !captcha) {
+              out.submitted = submitNow();
+            } else if (autoSubmit && out.pan && captcha && !window.__ipoOneAutoSubmitArmed) {
+              // The person solves the CAPTCHA; the form is sent for them once they stop typing
+              window.__ipoOneAutoSubmitArmed = true;
+              if (captcha.tagName === 'INPUT') {
+                captcha.focus();
+                var timer = null;
+                captcha.addEventListener('input', function() {
+                  clearTimeout(timer);
+                  if ((captcha.value || '').trim().length >= 4) timer = setTimeout(submitNow, 1200);
+                });
+              } else {
+                var poll = setInterval(function() {
+                  var token = document.querySelector('textarea[name="g-recaptcha-response"], input[name="cf-turnstile-response"], textarea[name="h-captcha-response"]');
+                  if (token && token.value) { clearInterval(poll); submitNow(); }
+                }, 1000);
               }
             }
             return JSON.stringify(out);

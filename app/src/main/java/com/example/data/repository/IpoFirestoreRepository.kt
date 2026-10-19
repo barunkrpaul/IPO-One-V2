@@ -313,6 +313,27 @@ class IpoFirestoreRepository(
         }
     }
 
+    /** Saves which broker a vault PAN applies through, and its client ID. */
+    suspend fun updatePanBroker(panId: String, broker: String, brokerClientId: String): Result<Unit> {
+        val uid = requireUserId()
+        val docRef = db.collection("users").document(uid).collection("pan_profiles").document(panId)
+        return try {
+            docRef.update(
+                mapOf(
+                    "broker" to broker.take(40),
+                    "brokerClientId" to brokerClientId.trim().take(40),
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, docRef.path)
+            Result.failure(e)
+        }
+    }
+
     /** Stores a registrar check result; [newStatus] also updates the status when the result is definite. */
     suspend fun updateAllotmentResult(
         appId: String,

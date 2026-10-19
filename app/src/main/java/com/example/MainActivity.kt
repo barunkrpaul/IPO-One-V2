@@ -426,6 +426,19 @@ fun MainAppContent(
                 showIntermediaries = false
                 selectedIpo = null
             },
+            onSetPanBroker = viewModel::setPanBroker,
+            onMarkApplied = { pan, category, lots ->
+                viewModel.submitIpoApplication(
+                    ipo = detailIpo,
+                    panHolderName = pan.holderName,
+                    panNumber = pan.panNumber,
+                    category = category,
+                    lotsApplied = lots,
+                    upiId = pan.upiId.takeIf { it.length >= 3 } ?: "not-set@upi",
+                    initialStatus = "Mandate Pending"
+                )
+            },
+            onAddPan = { showQuickAddPanModal = true },
             onIntermediaryClick = { role, name ->
                 intermediaryFocus = role to name
                 showIntermediaries = true
