@@ -13,12 +13,17 @@ jobs:
           get() { curl -sS -A "$UA" -H "Referer: https://www.investorgain.com/" -H "Accept: application/json" "$1"; }
           curl -sS -A "$UA" "https://www.investorgain.com/gmp/tonbo-imaging-india-ipo/2369/" > page.html
           curl -sS -A "$UA" "https://www.investorgain.com/gmp/acme-india-industries-ipo/2006/" > sme.html
+          B=https://webnodejs.investorgain.com/cloud/v2/report/data-read
+          for spec in "114/1/10/2026/2026-27/2/all" "114/1/10/2026/2026-27/0/all" "127/1/10/2026/2026-27/250/all" "127/1/10/2026/2026-27/0/all" "126/1/10/2026/2026-27/18/all" "125/1/10/2026/2026-27/18/all" "128/1/10/2026/2026-27/18/all" "113/1/10/2026/2026-27/0/all" "115/1/10/2026/2026-27/0/all" "116/1/10/2026/2026-27/0/all" "124/1/10/2026/2026-27/0/all"; do get "$B/$spec" > "x_$(echo $spec | cut -d/ -f1)_$(echo $spec | cut -d/ -f6).json"; done
           python3 - <<'PY'
-          import re,json
+          import re,json,glob
           def note(t): print("::notice::"+t.replace("\n"," ")[:3900])
-          for f in ["page.html","sme.html"]:
-              h=open(f).read().replace('\\"','"')
-              for kw in ['"ipoLeadManagersList":[','"ipoBiddingData":[','"market_maker_id"','Market Maker']:
-                  for m in list(re.finditer(re.escape(kw),h))[:2]:
-                      note(f+" "+kw+": "+h[m.start():m.start()+1500])
+          h=open("page.html").read().replace('\\"','"')
+          note("hrefs="+json.dumps(sorted(set(re.findall(r'/report/[a-z0-9-]+/\d+/\d*/?',h)))[:40]))
+          out=[]
+          for f in sorted(glob.glob("x_*.json")):
+              try: d=json.load(open(f)); rows=d.get("reportTableData") or []
+              except Exception: out.append(f+" bad"); continue
+              out.append(f+" n=%d tot=%s keys=%s row0=%s"%(len(rows),d.get("totalRecords"),list(rows[0].keys())[:14] if rows else [],json.dumps(rows[0],ensure_ascii=False)[:500] if rows else ""))
+          for o in out: note(o)
           PY
