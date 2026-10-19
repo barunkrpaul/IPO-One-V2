@@ -7,23 +7,16 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - name: fetch
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with: { java-version: '17', distribution: 'temurin' }
+      - name: run parser
         run: |
           UA="Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/129 Mobile Safari/537.36"
-          get() { curl -sS -A "$UA" -H "Referer: https://www.investorgain.com/" -H "Accept: application/json" "$1"; }
-          curl -sS -A "$UA" "https://www.investorgain.com/gmp/tonbo-imaging-india-ipo/2369/" > page.html
-          curl -sS -A "$UA" "https://www.investorgain.com/gmp/acme-india-industries-ipo/2006/" > sme.html
-          for u in "report/ipo-lead-manager-review/112/18/" "report/ipo-registrar-review/114/2/" "report/ipo-market-maker-vs-listing-gain/127/250/"; do curl -sS -A "$UA" "https://www.investorgain.com/$u" > "pg_$(echo $u | cut -d/ -f3).html"; done
-          python3 - <<'PY'
-          import re,json,glob
-          def note(t): print("::notice::"+t.replace("\n"," ")[:3900])
-          for f in sorted(glob.glob("pg_*.html")):
-              h=open(f).read().replace('\\"','"')
-              arrays=sorted(set(re.findall(r'"([a-zA-Z_]{3,40})":\[\{',h)))
-              links=sorted(set(re.findall(r'/report/[a-z0-9-]*(?:lead-manager|registrar|market-maker)[a-z0-9-]*/\d+/?',h)))
-              apis=sorted(set(re.findall(r'(?:webnodejs|/cloud/v2)[^"\s]{0,100}',h)))
-              note(f+" len=%d arrays=%s links=%s apis=%s"%(len(h),arrays,links[:15],apis[:10]))
-              for a in arrays:
-                  m=h.find('"%s":[{'%a)
-                  note(f+" "+a+": "+h[m:m+700])
-          PY
+          curl -sSL -o kc.zip https://github.com/JetBrains/kotlin/releases/download/v2.2.10/kotlin-compiler-2.2.10.zip && unzip -q kc.zip
+          curl -sSL -o json.jar https://repo1.maven.org/maven2/org/json/json/20240303/json-20240303.jar
+          curl -sS -A "$UA" "https://www.investorgain.com/gmp/tonbo-imaging-india-ipo/2369/" > tonbo.html
+          curl -sS -A "$UA" "https://www.investorgain.com/gmp/acme-india-industries-ipo/2006/" > acme.html
+          curl -sS -A "$UA" "https://www.investorgain.com/gmp/bls-polymers-ipo/1849/" > bls.html
+          kotlinc/bin/kotlinc -nowarn -cp json.jar probe/*.kt -d out
+          java -cp out:json.jar:kotlinc/lib/kotlin-stdlib.jar MainKt tonbo.html acme.html bls.html
