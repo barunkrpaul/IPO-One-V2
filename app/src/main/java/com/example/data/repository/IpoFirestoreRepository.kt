@@ -374,7 +374,7 @@ class IpoFirestoreRepository(
             .map { snapshot ->
                 snapshot.documents.associate { doc ->
                     // Timestamps become java.util.Date so the model stays free of Firebase types
-                    val data = doc.data.mapValues { (_, value) ->
+                    val data = doc.data.orEmpty().mapValues { (_, value) ->
                         if (value is Timestamp) value.toDate() else value
                     }
                     doc.id to IpoExtras.fromMap(data)
