@@ -1432,7 +1432,7 @@ fun AllotmentAndVaultScreen(
             hidePanNumbers = hidePanNumbers,
             onToggleHidePanNumbers = onToggleHidePanNumbers,
             onSaveAllotmentOutcome = onSaveAllotmentOutcome?.let { save ->
-                { target, outcome -> save(targetIpo, target, outcome) }
+                { target: AllotmentTarget, outcome: AllotmentOutcome -> save(targetIpo, target, outcome) }
             }
         )
     }
