@@ -61,7 +61,7 @@ jobs:
           set -o pipefail
           # On failure, repeat the key error lines as annotations so they show on the run summary
           gradle assembleDebug assembleRelease -x lint -x lintVitalRelease -Dorg.gradle.jvmargs="-Xmx4096m -Dfile.encoding=UTF-8" 2>&1 | tee build.log || {
-            grep -E "^e: |What went wrong|Execution failed|Caused by|keystore|Keystore|password|alias" build.log | head -20 | while IFS= read -r line; do echo "::error::$line"; done
+            grep -E -A6 "^e: |What went wrong" build.log | grep -v "^--$" | head -30 | while IFS= read -r line; do echo "::error::$line"; done
             exit 1
           }
           cp app/build/outputs/apk/release/app-release.apk IPO-One.apk
