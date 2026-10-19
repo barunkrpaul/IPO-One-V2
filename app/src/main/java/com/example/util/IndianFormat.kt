@@ -14,19 +14,25 @@ fun formatInr(amount: Double, maxDecimals: Int = 2, showPlus: Boolean = false): 
         showPlus && amount > 0 -> "+"
         else -> ""
     }
-    val plain = BigDecimal(abs(amount))
+    return sign + "₹" + formatIndianNumber(abs(amount), maxDecimals)
+}
+
+/** Indian digit grouping without a currency symbol: 1234567.5 -> "12,34,567.5". */
+fun formatIndianNumber(value: Double, maxDecimals: Int = 2): String {
+    val plain = BigDecimal(abs(value))
         .setScale(maxDecimals, RoundingMode.HALF_UP)
         .stripTrailingZeros()
         .toPlainString()
     val intPart = plain.substringBefore('.')
     val fraction = plain.substringAfter('.', "")
     return buildString {
-        append(sign)
-        append('₹')
+        if (value < 0) append('-')
         append(groupIndian(intPart))
         if (fraction.isNotEmpty()) append('.').append(fraction)
     }
 }
+
+fun formatIndianNumber(value: Long): String = formatIndianNumber(value.toDouble(), 0)
 
 fun formatInr(amount: Int, showPlus: Boolean = false): String = formatInr(amount.toDouble(), 0, showPlus)
 

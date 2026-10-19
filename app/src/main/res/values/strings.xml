@@ -30,4 +30,80 @@
     <string name="listed_issued">Issued %1$s</string>
     <string name="listed_listed">Listed %1$s (%2$s)</string>
     <string name="listed_now">Now %1$s (%2$s)</string>
+
+    <!-- IPO detail page -->
+    <string name="detail_back">Back</string>
+    <string name="detail_open_browser">Open in browser</string>
+    <string name="detail_watch_add">Add to watchlist</string>
+    <string name="detail_watch_remove">Remove from watchlist</string>
+    <string name="detail_logo">%1$s logo</string>
+    <string name="detail_website">Company website</string>
+    <string name="detail_mainboard">Mainboard</string>
+    <string name="detail_sme">SME</string>
+    <string name="detail_not_found">This IPO is no longer in the live feed.</string>
+    <string name="metric_price_range">Price range</string>
+    <string name="metric_gmp">GMP</string>
+    <string name="metric_lot_size">Lot size</string>
+    <string name="metric_issue_size">Issue size</string>
+    <string name="metric_min_investment">Min investment (RII)</string>
+    <string name="metric_lot_size_value">%1$d shares</string>
+    <string name="value_unavailable">-</string>
+
+    <string name="timeline_title">Timeline</string>
+    <string name="timeline_opens">Opens</string>
+    <string name="timeline_closes">Closes</string>
+    <string name="timeline_allotment">Allotment</string>
+    <string name="timeline_settlement">Settlement (credit to demat)</string>
+    <string name="timeline_listing">Listing</string>
+    <string name="timeline_mandate_end">Mandate end (UPI block release)</string>
+    <string name="timeline_anchor_50" formatted="false">Anchor lock-in 50%</string>
+    <string name="timeline_anchor_100" formatted="false">Anchor lock-in 100%</string>
+    <string name="timeline_estimated">estimated</string>
+    <string name="timeline_note">Timeline is tentative. Anchor unlock dates apply only to IPOs with an anchor allotment.</string>
+    <string name="timeline_empty">Dates not announced yet.</string>
+
+    <string name="subscription_title">Subscription</string>
+    <string name="subscription_shares">Shares</string>
+    <string name="subscription_applications">Applications</string>
+    <string name="subscription_refresh">Refresh subscription</string>
+    <string name="subscription_col_quota">Quota</string>
+    <string name="subscription_col_shares_offered">Offered (₹ Cr)</string>
+    <string name="subscription_col_shares_applied">Applied (₹ Cr)</string>
+    <string name="subscription_col_apps_reserved">Reserved</string>
+    <string name="subscription_col_apps_received">Received</string>
+    <string name="subscription_col_times">Times</string>
+    <string name="subscription_last_updated">Last updated: %1$s</string>
+    <string name="subscription_never_updated">Last updated: -</string>
+    <string name="sub_qib">QIB</string>
+    <string name="sub_qib_fii">FII</string>
+    <string name="sub_qib_dfi">DFI (Banks &amp; FIs)</string>
+    <string name="sub_qib_mf">MF</string>
+    <string name="sub_qib_other">Other</string>
+    <string name="sub_nii">NII</string>
+    <string name="sub_bnii">bNII (bids over ₹10 lakh)</string>
+    <string name="sub_snii">sNII (₹2–10 lakh)</string>
+    <string name="sub_rii">RII</string>
+    <string name="sub_employee">Employee</string>
+    <string name="sub_shareholder">Shareholder</string>
+    <string name="sub_total">Total</string>
+
+    <string name="app_size_title">Application size</string>
+    <string name="app_size_col_category">Category</string>
+    <string name="app_size_col_min">Min</string>
+    <string name="app_size_col_max">Max</string>
+    <string name="app_size_cell">%1$s shares · %2$s lots · %3$s</string>
+    <string name="app_size_footer">Based on the upper price band of %1$s.</string>
+    <string name="app_size_unavailable">Lot size and price are needed to work out application sizes.</string>
+
+    <string name="intermediaries_title">Intermediaries</string>
+    <string name="intermediaries_lead_managers">Lead managers</string>
+    <string name="intermediaries_registrar">Registrar</string>
+    <string name="intermediaries_market_maker">Market maker</string>
+    <string name="intermediaries_empty">Not available yet.</string>
+
+    <string name="my_applications_title">My applications</string>
+    <string name="my_applications_count">%1$d logged for this IPO</string>
+    <string name="my_applications_none">None logged for this IPO</string>
+    <string name="my_applications_check_all">Check allotment for all</string>
+    <string name="my_applications_row">%1$s · %2$s · %3$d lot(s) · %4$s</string>
 </resources>

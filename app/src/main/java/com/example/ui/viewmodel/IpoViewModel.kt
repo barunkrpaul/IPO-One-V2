@@ -49,7 +49,7 @@ class IpoViewModel(
     private val _liveIposState = MutableStateFlow<UiState<List<LiveIpoItem>>>(UiState.Loading)
 
     // ipo_extras/{ipoId} overlay; an unreachable or empty collection simply leaves the feed as is
-    private val ipoExtrasState: StateFlow<Map<String, IpoExtras>> = repository.observeIpoExtras()
+    val ipoExtrasState: StateFlow<Map<String, IpoExtras>> = repository.observeIpoExtras()
         .catch { e ->
             Log.w(TAG, "ipo_extras unavailable, using InvestorGain data only", e)
             emit(emptyMap())
@@ -66,6 +66,9 @@ class IpoViewModel(
             state
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, UiState.Loading)
+
+    private val _lastLiveRefreshMillis = MutableStateFlow<Long?>(null)
+    val lastLiveRefreshMillis: StateFlow<Long?> = _lastLiveRefreshMillis.asStateFlow()
 
     private val _statusFilter = MutableStateFlow(IpoStatusFilter.ALL)
     val statusFilter: StateFlow<IpoStatusFilter> = _statusFilter.asStateFlow()
@@ -209,6 +212,7 @@ class IpoViewModel(
             result.fold(
                 onSuccess = { list ->
                     _liveIposState.value = UiState.Success(list)
+                    _lastLiveRefreshMillis.value = System.currentTimeMillis()
                 },
                 onFailure = { err ->
                     Log.e(TAG, "Failed to fetch live InvestorGain IPOs", err)

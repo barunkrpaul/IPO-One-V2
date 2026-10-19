@@ -86,7 +86,7 @@ import com.example.ui.components.RegistrarDirectCheckRequest
 import com.example.ui.components.RegistrarVerificationModalSheet
 import com.example.ui.components.detectRegistrarForIpo
 import com.example.ui.screens.AllotmentAndVaultScreen
-import com.example.ui.screens.IpoDetailSheet
+import com.example.ui.screens.IpoDetailScreen
 import com.example.ui.screens.MainDashboardScreen
 import com.example.ui.screens.SecuritySettingsScreen
 import com.example.ui.theme.IpoOneTheme
@@ -196,6 +196,8 @@ fun MainAppContent(
     val applicationsState by viewModel.applicationsState.collectAsStateWithLifecycle()
     val watchlistState by viewModel.watchlistState.collectAsStateWithLifecycle()
     val statusBanner by viewModel.statusBanner.collectAsStateWithLifecycle()
+    val ipoExtras by viewModel.ipoExtrasState.collectAsStateWithLifecycle()
+    val lastLiveRefreshMillis by viewModel.lastLiveRefreshMillis.collectAsStateWithLifecycle()
 
     val userProfile = (userProfileState as? UiState.Success)?.data
     val watchedIds = remember(watchlistState) {
@@ -261,7 +263,62 @@ fun MainAppContent(
         return
     }
 
-    Scaffold(
+    // Prefer the freshest copy from the feed so a refresh on the detail page updates it
+    val detailIpo = selectedIpo?.let { selected ->
+        (allIposState as? UiState.Success)?.data?.firstOrNull { it.id == selected.id } ?: selected
+    }
+
+    if (detailIpo != null) {
+        IpoDetailScreen(
+            ipo = detailIpo,
+            extras = ipoExtras[detailIpo.id],
+            isWatched = watchedIds.contains(detailIpo.id),
+            lastUpdatedMillis = lastLiveRefreshMillis,
+            applications = appList,
+            panProfiles = panList,
+            hidePanNumbers = hidePanNumbers,
+            onBack = { selectedIpo = null },
+            onToggleWatch = {
+                viewModel.toggleWatchlist(detailIpo, watchedIds.contains(detailIpo.id))
+            },
+            onRefresh = viewModel::refreshLiveInvestorGainData,
+            onSubmitBid = { panHolderName, panNumber, category, lots, upiId ->
+                viewModel.submitIpoApplication(
+                    ipo = detailIpo,
+                    panHolderName = panHolderName,
+                    panNumber = panNumber,
+                    category = category,
+                    lotsApplied = lots,
+                    upiId = upiId
+                )
+            },
+            onApplyForAllPans = { targetIpo, pans ->
+                viewModel.applyIpoForAllSavedPans(targetIpo, pans)
+            },
+            onSaveBatchAllotmentResults = { summary, results ->
+                viewModel.saveBatchAllotmentResults(
+                    ipoId = summary.ipoId,
+                    ipoName = summary.ipoName,
+                    lotSize = summary.lotSize,
+                    issuePrice = summary.issuePrice,
+                    results = results
+                )
+            },
+            onAddPanProfile = viewModel::addPanProfile,
+            onToggleHidePanNumbers = viewModel::toggleHidePanNumbers,
+            onCheckAllotmentForAll = { registrar ->
+                activeMultiPanIpoCheck = AppliedIpoSummary(
+                    ipoId = detailIpo.id,
+                    ipoName = detailIpo.name,
+                    category = detailIpo.category,
+                    issuePrice = if (detailIpo.issuePrice > 0) detailIpo.issuePrice else 100,
+                    lotSize = if (detailIpo.lotSize > 0) detailIpo.lotSize else 15,
+                    boaDate = detailIpo.boaDate,
+                    registrar = registrar
+                )
+            }
+        )
+    } else Scaffold(
         contentWindowInsets = WindowInsets.safeDrawing,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -557,44 +614,6 @@ fun MainAppContent(
             request = req,
             onDismiss = { activeRegistrarRequest = null },
             onUpdateApplicationStatus = viewModel::setApplicationStatus
-        )
-    }
-
-    selectedIpo?.let { ipo ->
-        IpoDetailSheet(
-            ipo = ipo,
-            isWatched = watchedIds.contains(ipo.id),
-            panProfiles = panList,
-            onToggleWatch = {
-                viewModel.toggleWatchlist(ipo, watchedIds.contains(ipo.id))
-            },
-            onSubmitBid = { panHolderName, panNumber, category, lots, upiId ->
-                viewModel.submitIpoApplication(
-                    ipo = ipo,
-                    panHolderName = panHolderName,
-                    panNumber = panNumber,
-                    category = category,
-                    lotsApplied = lots,
-                    upiId = upiId
-                )
-            },
-            onDismiss = { selectedIpo = null },
-            existingApplications = appList,
-            onApplyForAllPans = { targetIpo, pans ->
-                viewModel.applyIpoForAllSavedPans(targetIpo, pans)
-            },
-            onSaveBatchAllotmentResults = { summary, results ->
-                viewModel.saveBatchAllotmentResults(
-                    ipoId = summary.ipoId,
-                    ipoName = summary.ipoName,
-                    lotSize = summary.lotSize,
-                    issuePrice = summary.issuePrice,
-                    results = results
-                )
-            },
-            onAddPanProfile = viewModel::addPanProfile,
-            hidePanNumbers = hidePanNumbers,
-            onToggleHidePanNumbers = viewModel::toggleHidePanNumbers
         )
     }
 }

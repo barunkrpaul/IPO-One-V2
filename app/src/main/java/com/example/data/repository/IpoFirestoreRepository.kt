@@ -7,6 +7,7 @@ import com.example.data.model.IpoExtras
 import com.example.data.model.PanProfile
 import com.example.data.model.UserProfile
 import com.example.data.model.WatchlistItem
+import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
@@ -372,7 +373,11 @@ class IpoFirestoreRepository(
         return colRef.snapshots()
             .map { snapshot ->
                 snapshot.documents.associate { doc ->
-                    doc.id to IpoExtras.fromMap(doc.data.orEmpty())
+                    // Timestamps become java.util.Date so the model stays free of Firebase types
+                    val data = doc.data.mapValues { (_, value) ->
+                        if (value is Timestamp) value.toDate() else value
+                    }
+                    doc.id to IpoExtras.fromMap(data)
                 }
             }
             .catch { error ->

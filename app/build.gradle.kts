@@ -98,6 +98,7 @@ dependencies {
 
     implementation(libs.okhttp)
     implementation(libs.gson)
+    implementation(libs.coil.compose)
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)

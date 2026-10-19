@@ -97,22 +97,6 @@ fun IpoDetailSheet(
     BackHandler { onDismiss() }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    var selectedLots by remember { mutableIntStateOf(1) }
-    var selectedCategory by remember { mutableStateOf("Retail") }
-    var selectedPanIndex by remember { mutableIntStateOf(0) }
-    var customHolderName by remember { mutableStateOf(panProfiles.firstOrNull()?.holderName ?: "") }
-    var customPanNumber by remember { mutableStateOf(panProfiles.firstOrNull()?.panNumber ?: "") }
-    var customUpiId by remember { mutableStateOf(panProfiles.firstOrNull()?.upiId ?: "") }
-    var showApplyForm by remember { mutableStateOf(false) }
-    var activeRegistrarRequest by remember { mutableStateOf<RegistrarDirectCheckRequest?>(null) }
-    var showMultiPanCheckSheet by remember { mutableStateOf(false) }
-    val isUpcomingPreApply = ipo.statusCode == "U"
-
-    val lotShares = if (ipo.lotSize > 0) ipo.lotSize else 1
-    val totalShares = lotShares * selectedLots
-    val totalInvestment = totalShares * ipo.issuePrice
-    val estTotalProfit = (ipo.gmpAmount * totalShares).roundToInt()
-
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -347,327 +331,378 @@ fun IpoDetailSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Interactive Lot & GMP Profit Calculator
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Calculate,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.secondary
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Multi-Lot GMP Profit Calculator",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(10.dp))
+            IpoApplyAndAllotmentSection(
+                ipo = ipo,
+                panProfiles = panProfiles,
+                onSubmitBid = onSubmitBid,
+                onBidSaved = onDismiss,
+                existingApplications = existingApplications,
+                onApplyForAllPans = onApplyForAllPans,
+                onSaveBatchAllotmentResults = onSaveBatchAllotmentResults,
+                onAddPanProfile = onAddPanProfile,
+                hidePanNumbers = hidePanNumbers,
+                onToggleHidePanNumbers = onToggleHidePanNumbers
+            )
+        }
+    }
+}
+
+/**
+ * Lot calculator, apply / pre-apply actions, single-bid form and registrar
+ * allotment checks. Shared by the bottom sheet and the full-screen detail page.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun IpoApplyAndAllotmentSection(
+    ipo: LiveIpoItem,
+    panProfiles: List<PanProfile>,
+    onSubmitBid: (panHolderName: String, panNumber: String, category: String, lots: Int, upiId: String) -> Unit,
+    onBidSaved: () -> Unit,
+    existingApplications: List<IpoApplication> = emptyList(),
+    onApplyForAllPans: ((LiveIpoItem, List<PanProfile>) -> Unit)? = null,
+    onSaveBatchAllotmentResults: ((AppliedIpoSummary, Map<PanProfile, String>) -> Unit)? = null,
+    onAddPanProfile: ((holderName: String, panNumber: String, dematId: String, upiId: String, category: String) -> Unit)? = null,
+    hidePanNumbers: Boolean = false,
+    onToggleHidePanNumbers: (() -> Unit)? = null,
+    registrar: AllotmentRegistrar = detectRegistrarForIpo(ipo.name, ipo.id)
+) {
+    var selectedLots by remember { mutableIntStateOf(1) }
+    var selectedCategory by remember { mutableStateOf("Retail") }
+    var selectedPanIndex by remember { mutableIntStateOf(0) }
+    var customHolderName by remember { mutableStateOf(panProfiles.firstOrNull()?.holderName ?: "") }
+    var customPanNumber by remember { mutableStateOf(panProfiles.firstOrNull()?.panNumber ?: "") }
+    var customUpiId by remember { mutableStateOf(panProfiles.firstOrNull()?.upiId ?: "") }
+    var showApplyForm by remember { mutableStateOf(false) }
+    var activeRegistrarRequest by remember { mutableStateOf<RegistrarDirectCheckRequest?>(null) }
+    var showMultiPanCheckSheet by remember { mutableStateOf(false) }
+    val isUpcomingPreApply = ipo.statusCode == "U"
+
+    val lotShares = if (ipo.lotSize > 0) ipo.lotSize else 1
+    val totalShares = lotShares * selectedLots
+    val totalInvestment = totalShares * ipo.issuePrice
+    val estTotalProfit = (ipo.gmpAmount * totalShares).roundToInt()
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        // Interactive Lot & GMP Profit Calculator
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Calculate,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.secondary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Lots: $selectedLots ($totalShares Shares) • Blocked Capital: ₹$totalInvestment",
+                        text = "Multi-Lot GMP Profit Calculator",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = "Lots: $selectedLots ($totalShares Shares) • Blocked Capital: ₹$totalInvestment",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Slider(
+                    value = selectedLots.toFloat(),
+                    onValueChange = { selectedLots = it.roundToInt().coerceIn(1, 25) },
+                    valueRange = 1f..25f,
+                    steps = 23,
+                    modifier = Modifier.testTag("lot_calculator_slider")
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Estimated Listing Gain ($selectedLots Lot${if (selectedLots > 1) "s" else ""}):",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                    Slider(
-                        value = selectedLots.toFloat(),
-                        onValueChange = { selectedLots = it.roundToInt().coerceIn(1, 25) },
-                        valueRange = 1f..25f,
-                        steps = 23,
-                        modifier = Modifier.testTag("lot_calculator_slider")
+                    Text(
+                        text = "+₹$estTotalProfit",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.primary
                     )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Narada-Style 1-Click Check Allotment Status for All Saved PAN Cards
+        Button(
+            onClick = { showMultiPanCheckSheet = true },
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFF10B981),
+                contentColor = Color(0xFF031B14)
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp)
+                .testTag("detail_check_all_pans_button"),
+            shape = RoundedCornerShape(14.dp)
+        ) {
+            Icon(Icons.Default.FactCheck, contentDescription = null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Click to Check Allotment Status (${panProfiles.size} Saved PANs)",
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.ExtraBold)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        if (onApplyForAllPans != null) {
+            SwipeToConfirmApplyBar(
+                label = if (isUpcomingPreApply) {
+                    "Swipe to Pre-Apply (${panProfiles.size.coerceAtLeast(1)} PANs)"
+                } else {
+                    "Swipe to Apply (${panProfiles.size.coerceAtLeast(1)} Saved PANs)"
+                },
+                isPreApply = isUpcomingPreApply,
+                onConfirmed = {
+                    onApplyForAllPans(ipo, panProfiles)
+                    showMultiPanCheckSheet = true
+                }
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+
+        if (!showApplyForm) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = { showApplyForm = true },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                        .testTag("open_apply_form_button"),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Icon(Icons.Default.AddCircle, contentDescription = null)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(if (isUpcomingPreApply) "Pre-Apply Single Bid" else "Log Single Bid")
+                }
+
+                if (onApplyForAllPans != null && panProfiles.isNotEmpty()) {
+                    Button(
+                        onClick = {
+                            onApplyForAllPans(ipo, panProfiles)
+                            showMultiPanCheckSheet = true
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .testTag("apply_all_saved_pans_button"),
+                        shape = RoundedCornerShape(14.dp)
                     ) {
+                        Icon(Icons.Default.Verified, contentDescription = null)
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Estimated Listing Gain ($selectedLots Lot${if (selectedLots > 1) "s" else ""}):",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "+₹$estTotalProfit",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.primary
+                            if (isUpcomingPreApply) "Pre-Apply (${panProfiles.size}) PANs"
+                            else "Apply All (${panProfiles.size}) PANs"
                         )
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Narada-Style 1-Click Check Allotment Status for All Saved PAN Cards
-            Button(
-                onClick = { showMultiPanCheckSheet = true },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF10B981),
-                    contentColor = Color(0xFF031B14)
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp)
-                    .testTag("detail_check_all_pans_button"),
-                shape = RoundedCornerShape(14.dp)
+        } else {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                Icon(Icons.Default.FactCheck, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Click to Check Allotment Status (${panProfiles.size} Saved PANs)",
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.ExtraBold)
-                )
-            }
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = if (isUpcomingPreApply) "Pre-Apply IPO Bid in Cloud Vault" else "Track IPO Application in Cloud Vault",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
 
-            Spacer(modifier = Modifier.height(10.dp))
-
-            if (onApplyForAllPans != null) {
-                SwipeToConfirmApplyBar(
-                    label = if (isUpcomingPreApply) {
-                        "Swipe to Pre-Apply (${panProfiles.size.coerceAtLeast(1)} PANs)"
-                    } else {
-                        "Swipe to Apply (${panProfiles.size.coerceAtLeast(1)} Saved PANs)"
-                    },
-                    isPreApply = isUpcomingPreApply,
-                    onConfirmed = {
-                        onApplyForAllPans(ipo, panProfiles)
-                        showMultiPanCheckSheet = true
+                    if (panProfiles.isNotEmpty()) {
+                        Text(
+                            text = "Select Family PAN from Vault (Edit details below if needed):",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            panProfiles.forEachIndexed { idx, profile ->
+                                FilterChip(
+                                    selected = selectedPanIndex == idx,
+                                    onClick = {
+                                        selectedPanIndex = idx
+                                        customHolderName = profile.holderName
+                                        customPanNumber = profile.panNumber
+                                        customUpiId = profile.upiId
+                                        selectedCategory = profile.category
+                                    },
+                                    label = {
+                                        Text("${profile.holderName} (${maskPanNumber(profile.panNumber, hidePanNumbers)})")
+                                    }
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
                     }
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-            }
 
-            if (!showApplyForm) {
+                    OutlinedTextField(
+                        value = customHolderName,
+                        onValueChange = { customHolderName = it },
+                        label = { Text("Applicant Name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedTextField(
+                        value = customPanNumber,
+                        onValueChange = { customPanNumber = it.uppercase().take(10) },
+                        label = { Text("10-Char PAN Number (e.g. ABCDE1234F)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedTextField(
+                        value = customUpiId,
+                        onValueChange = { customUpiId = it },
+                        label = { Text("ASBA UPI ID (e.g. investor@okicici)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("Retail", "sHNI", "bHNI").forEach { cat ->
+                            FilterChip(
+                                selected = selectedCategory == cat,
+                                onClick = { selectedCategory = cat },
+                                label = { Text(cat) }
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = {
+                            val validPan = customPanNumber.trim().uppercase().padEnd(10, 'X').take(10)
+                            val validName = customHolderName.trim().ifBlank { "Primary Investor" }
+                            val validUpi = customUpiId.trim().ifBlank { "investor@upi" }
+                            onSubmitBid(validName, validPan, selectedCategory, selectedLots, validUpi)
+                            showApplyForm = false
+                            onBidSaved()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("confirm_submit_bid_button")
+                    ) {
+                        Icon(Icons.Default.Verified, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            if (isUpcomingPreApply) "Confirm Pre-Apply ($selectedLots Lot • ₹$totalInvestment)"
+                            else "Save Bid ($selectedLots Lot • ₹$totalInvestment)"
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // 1-Click Allotment Registrar Direct Check Card inside IPO Detail Sheet
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("detail_sheet_registrar_check_card"),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+            )
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Allotment Registrar Direct Check",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "One-click allotment status verification (BoA: ${ipo.boaDate.ifBlank { "TBA" }})",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    OutlinedButton(
-                        onClick = { showApplyForm = true },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp)
-                            .testTag("open_apply_form_button"),
-                        shape = RoundedCornerShape(14.dp)
-                    ) {
-                        Icon(Icons.Default.AddCircle, contentDescription = null)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(if (isUpcomingPreApply) "Pre-Apply Single Bid" else "Log Single Bid")
-                    }
-
-                    if (onApplyForAllPans != null && panProfiles.isNotEmpty()) {
-                        Button(
-                            onClick = {
-                                onApplyForAllPans(ipo, panProfiles)
-                                showMultiPanCheckSheet = true
-                            },
+                    listOf(
+                        AllotmentRegistrar.LINK_INTIME,
+                        AllotmentRegistrar.KFINTECH,
+                        AllotmentRegistrar.BIGSHARE
+                    ).forEach { reg ->
+                        Surface(
+                            color = reg.accentColor.copy(alpha = 0.14f),
+                            shape = RoundedCornerShape(10.dp),
                             modifier = Modifier
                                 .weight(1f)
-                                .height(48.dp)
-                                .testTag("apply_all_saved_pans_button"),
-                            shape = RoundedCornerShape(14.dp)
-                        ) {
-                            Icon(Icons.Default.Verified, contentDescription = null)
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                if (isUpcomingPreApply) "Pre-Apply (${panProfiles.size}) PANs"
-                                else "Apply All (${panProfiles.size}) PANs"
-                            )
-                        }
-                    }
-                }
-            } else {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = if (isUpcomingPreApply) "Pre-Apply IPO Bid in Cloud Vault" else "Track IPO Application in Cloud Vault",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        if (panProfiles.isNotEmpty()) {
-                            Text(
-                                text = "Select Family PAN from Vault (Edit details below if needed):",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                panProfiles.forEachIndexed { idx, profile ->
-                                    FilterChip(
-                                        selected = selectedPanIndex == idx,
-                                        onClick = {
-                                            selectedPanIndex = idx
-                                            customHolderName = profile.holderName
-                                            customPanNumber = profile.panNumber
-                                            customUpiId = profile.upiId
-                                            selectedCategory = profile.category
-                                        },
-                                        label = {
-                                            Text("${profile.holderName} (${maskPanNumber(profile.panNumber, hidePanNumbers)})")
-                                        }
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                        }
-
-                        OutlinedTextField(
-                            value = customHolderName,
-                            onValueChange = { customHolderName = it },
-                            label = { Text("Applicant Name") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        OutlinedTextField(
-                            value = customPanNumber,
-                            onValueChange = { customPanNumber = it.uppercase().take(10) },
-                            label = { Text("10-Char PAN Number (e.g. ABCDE1234F)") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        OutlinedTextField(
-                            value = customUpiId,
-                            onValueChange = { customUpiId = it },
-                            label = { Text("ASBA UPI ID (e.g. investor@okicici)") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf("Retail", "sHNI", "bHNI").forEach { cat ->
-                                FilterChip(
-                                    selected = selectedCategory == cat,
-                                    onClick = { selectedCategory = cat },
-                                    label = { Text(cat) }
+                                .border(
+                                    1.dp,
+                                    reg.accentColor.copy(alpha = 0.45f),
+                                    RoundedCornerShape(10.dp)
                                 )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Button(
-                            onClick = {
-                                val validPan = customPanNumber.trim().uppercase().padEnd(10, 'X').take(10)
-                                val validName = customHolderName.trim().ifBlank { "Primary Investor" }
-                                val validUpi = customUpiId.trim().ifBlank { "investor@upi" }
-                                onSubmitBid(validName, validPan, selectedCategory, selectedLots, validUpi)
-                                showApplyForm = false
-                                onDismiss()
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("confirm_submit_bid_button")
-                        ) {
-                            Icon(Icons.Default.Verified, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                if (isUpcomingPreApply) "Confirm Pre-Apply ($selectedLots Lot • ₹$totalInvestment)"
-                                else "Save Bid ($selectedLots Lot • ₹$totalInvestment)"
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // 1-Click Allotment Registrar Direct Check Card inside IPO Detail Sheet
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("detail_sheet_registrar_check_card"),
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-                )
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Allotment Registrar Direct Check",
-                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "One-click allotment status verification (BoA: ${ipo.boaDate.ifBlank { "TBA" }})",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        listOf(
-                            AllotmentRegistrar.LINK_INTIME,
-                            AllotmentRegistrar.KFINTECH,
-                            AllotmentRegistrar.BIGSHARE
-                        ).forEach { reg ->
-                            Surface(
-                                color = reg.accentColor.copy(alpha = 0.14f),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .border(
-                                        1.dp,
-                                        reg.accentColor.copy(alpha = 0.45f),
-                                        RoundedCornerShape(10.dp)
-                                    )
-                                    .clickable {
-                                        activeRegistrarRequest = RegistrarDirectCheckRequest(
-                                            registrar = reg,
-                                            panNumber = customPanNumber.trim().uppercase(),
-                                            holderName = customHolderName.ifBlank { "Primary Investor" },
-                                            ipoName = ipo.name
-                                        )
-                                    }
-                                    .testTag("detail_check_${reg.name.lowercase()}")
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 9.dp),
-                                    horizontalArrangement = Arrangement.Center,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Verified,
-                                        contentDescription = null,
-                                        tint = reg.accentColor,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = reg.shortName,
-                                        style = MaterialTheme.typography.labelMedium.copy(
-                                            fontWeight = FontWeight.Bold
-                                        ),
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        maxLines = 1
+                                .clickable {
+                                    activeRegistrarRequest = RegistrarDirectCheckRequest(
+                                        registrar = reg,
+                                        panNumber = customPanNumber.trim().uppercase(),
+                                        holderName = customHolderName.ifBlank { "Primary Investor" },
+                                        ipoName = ipo.name
                                     )
                                 }
+                                .testTag("detail_check_${reg.name.lowercase()}")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 9.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Verified,
+                                    contentDescription = null,
+                                    tint = reg.accentColor,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = reg.shortName,
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1
+                                )
                             }
                         }
                     }
@@ -684,7 +719,7 @@ fun IpoDetailSheet(
             issuePrice = if (ipo.issuePrice > 0) ipo.issuePrice else 100,
             lotSize = if (ipo.lotSize > 0) ipo.lotSize else 15,
             boaDate = ipo.boaDate,
-            registrar = detectRegistrarForIpo(ipo.name, ipo.id)
+            registrar = registrar
         )
         MultiPanAllotmentCheckModalSheet(
             appliedIpo = summary,
@@ -742,7 +777,7 @@ fun StatusBadge(statusCode: String, statusLabel: String) {
 }
 
 @Composable
-private fun MetricBox(label: String, value: String, modifier: Modifier = Modifier) {
+internal fun MetricBox(label: String, value: String, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),

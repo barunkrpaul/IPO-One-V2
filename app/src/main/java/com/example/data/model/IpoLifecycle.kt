@@ -26,23 +26,66 @@ data class IpoKeyDate(val kind: KeyDateKind, val date: LocalDate)
 
 /**
  * Hand-maintained values from Firestore `ipo_extras/{ipoId}` for data that
- * InvestorGain does not provide. Every field is optional.
+ * InvestorGain does not provide. Every field is optional; dates are ISO strings
+ * ("2026-10-21") or Firestore timestamps.
  */
 data class IpoExtras(
     val priceBandLow: Int? = null,
     val preApplyOpen: Boolean? = null,
     val listingPrice: Double? = null,
     val currentPrice: Double? = null,
-    val cancelled: Boolean? = null
+    val cancelled: Boolean? = null,
+    val symbol: String? = null,
+    val logoUrl: String? = null,
+    val website: String? = null,
+    val settlementDate: LocalDate? = null,
+    val mandateEndDate: LocalDate? = null,
+    val anchorLockIn50Date: LocalDate? = null,
+    val anchorLockIn100Date: LocalDate? = null,
+    val leadManagers: List<String> = emptyList(),
+    val registrar: String? = null,
+    val marketMaker: String? = null,
+    val subscription: Map<SubscriptionCategory, SubscriptionFigures> = emptyMap(),
+    val subscriptionUpdatedAtMillis: Long? = null
 ) {
     companion object {
-        fun fromMap(data: Map<String, Any?>): IpoExtras = IpoExtras(
-            priceBandLow = data["priceBandLow"].asDouble()?.toInt(),
-            preApplyOpen = data["preApplyOpen"].asBoolean(),
-            listingPrice = data["listingPrice"].asDouble(),
-            currentPrice = data["currentPrice"].asDouble(),
-            cancelled = data["cancelled"].asBoolean()
-        )
+        fun fromMap(data: Map<String, Any?>): IpoExtras {
+            val subscriptionMap = (data["subscription"] as? Map<*, *>).orEmpty()
+            return IpoExtras(
+                priceBandLow = data["priceBandLow"].asDouble()?.toInt(),
+                preApplyOpen = data["preApplyOpen"].asBoolean(),
+                listingPrice = data["listingPrice"].asDouble(),
+                currentPrice = data["currentPrice"].asDouble(),
+                cancelled = data["cancelled"].asBoolean(),
+                symbol = data["symbol"].asText(),
+                logoUrl = data["logoUrl"].asText(),
+                website = data["website"].asText(),
+                settlementDate = data["settlementDate"].asDate(),
+                mandateEndDate = data["mandateEndDate"].asDate(),
+                anchorLockIn50Date = data["anchorLockIn50Date"].asDate(),
+                anchorLockIn100Date = data["anchorLockIn100Date"].asDate(),
+                leadManagers = (data["leadManagers"] as? List<*>).orEmpty()
+                    .mapNotNull { it.asText() },
+                registrar = data["registrar"].asText(),
+                marketMaker = data["marketMaker"].asText(),
+                subscription = SubscriptionCategory.entries.mapNotNull { category ->
+                    val row = subscriptionMap[category.key] as? Map<*, *> ?: return@mapNotNull null
+                    category to SubscriptionFigures(
+                        quotaPct = row["quotaPct"].asDouble(),
+                        sharesOfferedCr = row["sharesOfferedCr"].asDouble(),
+                        sharesAppliedCr = row["sharesAppliedCr"].asDouble(),
+                        applicationsReserved = row["applicationsReserved"].asDouble()?.toLong(),
+                        applicationsReceived = row["applicationsReceived"].asDouble()?.toLong(),
+                        times = row["times"].asDouble()
+                    )
+                }.toMap(),
+                subscriptionUpdatedAtMillis = when (val v = data["subscriptionUpdatedAt"]) {
+                    is java.util.Date -> v.time
+                    is Number -> v.toLong()
+                    else -> null
+                }
+            )
+        }
 
         private fun Any?.asDouble(): Double? = when (this) {
             is Number -> toDouble()
@@ -57,6 +100,16 @@ data class IpoExtras(
                 "false", "no", "0" -> false
                 else -> null
             }
+            else -> null
+        }
+
+        private fun Any?.asText(): String? = (this as? String)?.trim()?.takeIf { it.isNotEmpty() }
+
+        private fun Any?.asDate(): LocalDate? = when (this) {
+            is java.util.Date -> java.time.Instant.ofEpochMilli(time)
+                .atZone(java.time.ZoneId.of("Asia/Kolkata"))
+                .toLocalDate()
+            is String -> runCatching { LocalDate.parse(trim().take(10)) }.getOrNull()
             else -> null
         }
     }
