@@ -18,15 +18,11 @@ jobs:
           def note(t): print("::notice::"+t.replace("\n"," ")[:3900])
           for f in ["page.html","sme.html"]:
               h=open(f).read().replace('\\"','"')
-              urls=sorted(set(re.findall(r'webnodejs[^"\s]{0,120}',h)))
-              note(f+" api urls="+json.dumps(urls[:30]))
-              i=h.find('"lead_managers"')
-              if i>0:
-                  st=h.rfind('{"',0,i-3000) if i>3000 else 0
-                  blob=h[max(0,i-6000):i+6000]
-                  keys=sorted(set(re.findall(r'"([a-zA-Z_]{3,40})":',blob)))
-                  note(f+" keys near="+",".join(keys)[:3800])
-              for kw in ['"lm_name"','"lead_manager_name"','"registrar_name"','"market_maker','logo_url','"company_logo','ipo_allotment_url','"lead_manager_list','"leadManagers','"registrar":{','"registrar_id"']:
-                  m=h.find(kw)
-                  if m>=0: note(f+" "+kw+": "+h[max(0,m-150):m+500])
+              infos=sorted(set(re.findall(r'"([a-zA-Z_]{3,40})":\[\{',h)))
+              note(f+" arrays="+",".join(infos))
+              for kw in ['"leadManager','"lead_manager_name','"lm_name','"marketMaker','"market_maker_name','tonbo-imaging-india-ltd-logo','acme','"nse_symbol','"nse_script','"symbol"']:
+                  for m in list(re.finditer(re.escape(kw),h))[:1]:
+                      note(f+" "+kw+": "+h[max(0,m.start()-200):m.start()+500])
+              for m in list(re.finditer(r'https?://[^"\s]*logo[^"\s]*',h))[:3]:
+                  note(f+" logo url: "+m.group(0))
           PY
