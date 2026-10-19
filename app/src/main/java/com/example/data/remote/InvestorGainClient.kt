@@ -294,7 +294,9 @@ class InvestorGainClient(
                 if (name.isEmpty()) null else NamedIntermediary(obj.opt("id")?.toString().orEmpty(), name)
             }
 
-            val capPrice = IpoPageParser.extractValue(text, "cap_price")?.toDoubleOrNull()
+            // floor_price / cap_price are usually blank; the band lives in issue_price_lower / _upper
+            val capPrice = IpoPageParser.extractValue(text, "issue_price_upper")?.toDoubleOrNull()
+                ?: IpoPageParser.extractValue(text, "cap_price")?.toDoubleOrNull()
             val latestBidding = IpoPageParser.extractJsonArray(text, "ipoBiddingData")
                 ?.let { runCatching { JSONArray(it) }.getOrNull() }
                 ?.let { arr -> if (arr.length() > 0) arr.optJSONObject(arr.length() - 1) else null }
@@ -311,7 +313,8 @@ class InvestorGainClient(
                 symbol = IpoPageParser.extractValue(text, "nse_symbol")
                     ?: IpoPageParser.extractValue(text, "bse_scripcode"),
                 logoUrl = logoFile?.let { if (it.startsWith("http")) it else "https://www.chittorgarh.net/images/ipo/$it" },
-                floorPrice = IpoPageParser.extractValue(text, "floor_price")?.toDoubleOrNull(),
+                floorPrice = IpoPageParser.extractValue(text, "issue_price_lower")?.toDoubleOrNull()
+                    ?: IpoPageParser.extractValue(text, "floor_price")?.toDoubleOrNull(),
                 settlementDate = IpoPageParser.extractIsoDate(text, "timetable_share_credit_dt"),
                 anchorLockIn50Date = IpoPageParser.extractIsoDate(text, "timetable_anchor_lockin_end_dt_1"),
                 anchorLockIn100Date = IpoPageParser.extractIsoDate(text, "timetable_anchor_lockin_end_dt_2"),
