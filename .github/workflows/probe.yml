@@ -20,3 +20,10 @@ jobs:
           curl -sS -A "$UA" "https://www.investorgain.com/gmp/bls-polymers-ipo/1849/" > bls.html
           kotlinc/bin/kotlinc -nowarn -cp json.jar probe/*.kt -d out
           java -cp out:json.jar:kotlinc/lib/kotlin-stdlib.jar MainKt tonbo.html acme.html bls.html
+          python3 -c "
+          import re
+          for f in ['tonbo.html','acme.html']:
+              h=open(f).read().replace('\\\\\"','\"')
+              for k in ['floor_price','cap_price','issue_price']:
+                  print('::notice::'+f+' '+k+' '+' || '.join(h[m.start():m.start()+40] for m in list(re.finditer(k,h))[:4]))
+          "
