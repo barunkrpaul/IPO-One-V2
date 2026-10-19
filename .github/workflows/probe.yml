@@ -11,22 +11,22 @@ jobs:
         run: |
           UA="Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/129 Mobile Safari/537.36"
           get() { curl -sS -A "$UA" -H "Referer: https://www.investorgain.com/" -H "Accept: application/json" "$1"; }
-          B=https://webnodejs.investorgain.com/cloud/v2
-          get "$B/ipo/list-read" > list.json
-          for u in "ipo/read/2369" "ipo/detail-read/2369" "ipo/2369" "ipo/data-read/2369" "ipo/details/2369"; do get "$B/$u" > "e_$(echo $u | tr / _).json"; done
           curl -sS -A "$UA" "https://www.investorgain.com/gmp/tonbo-imaging-india-ipo/2369/" > page.html
+          curl -sS -A "$UA" "https://www.investorgain.com/gmp/acme-india-industries-ipo/2006/" > sme.html
           python3 - <<'PY'
-          import json,glob,re
+          import re,json
           def note(t): print("::notice::"+t.replace("\n"," ")[:3900])
-          try:
-              d=json.load(open("list.json")); l=d.get("ipoList") or []
-              note("list keys=%s n=%d item=%s"%(list(d.keys()),len(l),json.dumps(l[:1],ensure_ascii=False)))
-          except Exception as e: note("list err "+open("list.json").read()[:300])
-          for f in sorted(glob.glob("e_*.json")):
-              note(f+" "+open(f).read()[:600])
-          h=open("page.html").read()
-          note("page len=%d"%len(h))
-          for kw in ["registrar","Registrar","lead_manager","Lead Manager","market_maker","Market Maker","__NEXT_DATA__","buildId"]:
-              for m in list(re.finditer(kw,h))[:2]:
-                  note(kw+": "+h[max(0,m.start()-200):m.start()+400])
+          for f in ["page.html","sme.html"]:
+              h=open(f).read().replace('\\"','"')
+              urls=sorted(set(re.findall(r'webnodejs[^"\s]{0,120}',h)))
+              note(f+" api urls="+json.dumps(urls[:30]))
+              i=h.find('"lead_managers"')
+              if i>0:
+                  st=h.rfind('{"',0,i-3000) if i>3000 else 0
+                  blob=h[max(0,i-6000):i+6000]
+                  keys=sorted(set(re.findall(r'"([a-zA-Z_]{3,40})":',blob)))
+                  note(f+" keys near="+",".join(keys)[:3800])
+              for kw in ['"lm_name"','"lead_manager_name"','"registrar_name"','"market_maker','logo_url','"company_logo','ipo_allotment_url','"lead_manager_list','"leadManagers','"registrar":{','"registrar_id"']:
+                  m=h.find(kw)
+                  if m>=0: note(f+" "+kw+": "+h[max(0,m-150):m+500])
           PY
