@@ -49,6 +49,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import com.example.ui.theme.ipo
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -69,16 +71,23 @@ import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 
-/** Event colours shared by the calendar, its legend and the dashboard's today strip. */
-internal fun calendarEventColor(event: TimelineEvent): Color = when (event) {
-    TimelineEvent.OPENS -> Color(0xFF34D399)
-    TimelineEvent.CLOSES -> Color(0xFFFBBF24)
-    TimelineEvent.ALLOTMENT -> Color(0xFFC084FC)
-    TimelineEvent.SETTLEMENT -> Color(0xFF2DD4BF)
-    TimelineEvent.LISTING -> Color(0xFF60A5FA)
-    TimelineEvent.MANDATE_END -> Color(0xFFF472B6)
-    TimelineEvent.ANCHOR_50 -> Color(0xFFFB923C)
-    TimelineEvent.ANCHOR_100 -> Color(0xFFF87171)
+/**
+ * Event colours shared by the calendar, its legend and the dashboard's today
+ * strip; deeper shades on light backgrounds so dots and labels keep contrast.
+ */
+@Composable
+internal fun calendarEventColor(event: TimelineEvent): Color {
+    val light = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    return when (event) {
+        TimelineEvent.OPENS -> MaterialTheme.ipo.gain
+        TimelineEvent.CLOSES -> MaterialTheme.ipo.warning
+        TimelineEvent.ALLOTMENT -> MaterialTheme.ipo.accent
+        TimelineEvent.SETTLEMENT -> if (light) Color(0xFF0F766E) else Color(0xFF2DD4BF)
+        TimelineEvent.LISTING -> MaterialTheme.ipo.info
+        TimelineEvent.MANDATE_END -> if (light) Color(0xFFBE185D) else Color(0xFFF472B6)
+        TimelineEvent.ANCHOR_50 -> if (light) Color(0xFFC2410C) else Color(0xFFFB923C)
+        TimelineEvent.ANCHOR_100 -> MaterialTheme.ipo.loss
+    }
 }
 
 @StringRes

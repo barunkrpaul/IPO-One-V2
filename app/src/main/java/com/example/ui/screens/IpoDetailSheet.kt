@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import com.example.ui.theme.ipo
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
@@ -211,7 +212,7 @@ fun IpoDetailSheet(
                                     Icon(
                                         imageVector = Icons.Default.LocalFireDepartment,
                                         contentDescription = null,
-                                        tint = if (idx < ipo.fireRating) Color(0xFFFF9800) else Color(0xFF334155),
+                                        tint = if (idx < ipo.fireRating) MaterialTheme.ipo.warning else MaterialTheme.ipo.panelBorder,
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }
@@ -443,8 +444,8 @@ fun IpoApplyAndAllotmentSection(
         Button(
             onClick = { showMultiPanCheckSheet = true },
             colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFF10B981),
-                contentColor = Color(0xFF031B14)
+                containerColor = MaterialTheme.ipo.gain,
+                contentColor = MaterialTheme.ipo.onGain
             ),
             modifier = Modifier
                 .fillMaxWidth()
@@ -760,13 +761,13 @@ fun IpoApplyAndAllotmentSection(
 @Composable
 fun StatusBadge(statusCode: String, statusLabel: String) {
     val (bg, fg) = when (statusCode) {
-        "O", "CT" -> Color(0xFF064E3B) to Color(0xFF34D399)
-        "U" -> Color(0xFF451A03) to Color(0xFFFBBF24)
-        "C" -> Color(0xFF1E3A8A) to Color(0xFF60A5FA)
-        "LP" -> Color(0xFF065F46) to Color(0xFF6EE7B7)
-        "A" -> Color(0xFF3B0764) to Color(0xFFC084FC)
-        "X" -> Color(0xFF450A0A) to Color(0xFFF87171)
-        else -> Color(0xFF334155) to Color(0xFFCBD5E1)
+        "O", "CT" -> MaterialTheme.ipo.gainContainer to MaterialTheme.ipo.gain
+        "U" -> MaterialTheme.ipo.warningContainer to MaterialTheme.ipo.warning
+        "C" -> MaterialTheme.ipo.infoContainer to MaterialTheme.ipo.info
+        "LP" -> MaterialTheme.ipo.gainContainer to MaterialTheme.ipo.onGainContainer
+        "A" -> MaterialTheme.ipo.accentContainer to MaterialTheme.ipo.accent
+        "X" -> MaterialTheme.ipo.lossContainer to MaterialTheme.ipo.loss
+        else -> MaterialTheme.ipo.panelBorder to MaterialTheme.ipo.onPanel
     }
     Surface(
         color = bg,

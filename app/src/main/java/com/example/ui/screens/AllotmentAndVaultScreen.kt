@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import com.example.ui.theme.ipo
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
@@ -943,8 +944,8 @@ fun AllotmentAndVaultScreen(
                                 activeMultiPanIpoCheck = appliedIpo
                             },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF10B981),
-                                contentColor = Color(0xFF031B14)
+                                containerColor = MaterialTheme.ipo.gain,
+                                contentColor = MaterialTheme.ipo.onGain
                             ),
                             shape = RoundedCornerShape(14.dp),
                             modifier = Modifier
@@ -1010,9 +1011,9 @@ fun AllotmentAndVaultScreen(
                                             .clip(RoundedCornerShape(10.dp))
                                             .background(
                                                 when {
-                                                    isAllotted -> Color(0xFF064E3B).copy(alpha = 0.35f)
-                                                    isNotAllotted -> Color(0xFF450A0A).copy(alpha = 0.35f)
-                                                    isMandatePending -> Color(0xFF451A03).copy(alpha = 0.35f)
+                                                    isAllotted -> MaterialTheme.ipo.gainContainer.copy(alpha = 0.35f)
+                                                    isNotAllotted -> MaterialTheme.ipo.lossContainer.copy(alpha = 0.35f)
+                                                    isMandatePending -> MaterialTheme.ipo.warningContainer.copy(alpha = 0.35f)
                                                     else -> MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
                                                 }
                                             )
@@ -1056,10 +1057,11 @@ fun AllotmentAndVaultScreen(
                                             // Status Badge against each PAN Card
                                             Surface(
                                                 color = when {
-                                                    isAllotted -> Color(0xFF059669)
-                                                    isNotAllotted -> Color(0xFF991B1B)
-                                                    isMandatePending -> Color(0xFFD97706)
-                                                    else -> Color(0xFF1E3A8A)
+                                                    isAllotted -> MaterialTheme.ipo.gainStrong
+                                                    isNotAllotted -> MaterialTheme.ipo.lossStrong
+                                                    // Fixed deep tones so the white label reads in every theme
+                                                    isMandatePending -> Color(0xFFB45309)
+                                                    else -> Color(0xFF0369A1)
                                                 },
                                                 shape = RoundedCornerShape(8.dp),
                                                 modifier = Modifier

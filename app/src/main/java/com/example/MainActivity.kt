@@ -3,7 +3,9 @@ package com.example
 import android.os.Bundle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
+import com.example.data.local.ThemeMode
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -135,6 +137,22 @@ class MainActivity : FragmentActivity() {
         val settingsStore = AppSettingsStore(this)
         setContent {
             val settings by settingsStore.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
+            val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
+            val useDarkBars = when (settings.themeMode) {
+                ThemeMode.LIGHT -> false
+                ThemeMode.SYSTEM -> systemDark
+                else -> true
+            }
+            // Status and navigation bar icons follow the app theme, not just the system one
+            LaunchedEffect(useDarkBars) {
+                val transparent = android.graphics.Color.TRANSPARENT
+                enableEdgeToEdge(
+                    statusBarStyle = if (useDarkBars) SystemBarStyle.dark(transparent)
+                    else SystemBarStyle.light(transparent, transparent),
+                    navigationBarStyle = if (useDarkBars) SystemBarStyle.dark(transparent)
+                    else SystemBarStyle.light(transparent, transparent)
+                )
+            }
             IpoOneTheme(themeMode = settings.themeMode) {
                 AppRootNavigation()
             }

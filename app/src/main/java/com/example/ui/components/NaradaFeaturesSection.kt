@@ -1,5 +1,6 @@
 package com.example.ui.components
 
+import com.example.ui.theme.ipo
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -91,9 +92,9 @@ fun AllotmentOverviewBannerCard(
                 .background(
                     Brush.linearGradient(
                         colors = listOf(
-                            Color(0xFF071326),
-                            Color(0xFF0D213F),
-                            Color(0xFF062C29)
+                            MaterialTheme.ipo.panel,
+                            MaterialTheme.ipo.panelVariant,
+                            MaterialTheme.ipo.gainContainer
                         )
                     )
                 )
@@ -109,22 +110,22 @@ fun AllotmentOverviewBannerCard(
                         Text(
                             text = "ALLOTMENT & MANDATE OVERVIEW",
                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.ExtraBold),
-                            color = Color(0xFF34D399)
+                            color = MaterialTheme.ipo.gain
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "1-Click Multi-PAN Tracker",
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = Color.White
+                            color = MaterialTheme.ipo.onPanel
                         )
                     }
 
                     Surface(
-                        color = if (hidePanNumbers) Color(0xFF064E3B) else Color(0xFF1E293B),
+                        color = if (hidePanNumbers) MaterialTheme.ipo.gainContainer else MaterialTheme.ipo.panelVariant,
                         shape = RoundedCornerShape(10.dp),
                         border = BorderStroke(
                             1.dp,
-                            if (hidePanNumbers) Color(0xFF34D399) else Color(0xFF38BDF8).copy(alpha = 0.5f)
+                            if (hidePanNumbers) MaterialTheme.ipo.gain else MaterialTheme.ipo.info.copy(alpha = 0.5f)
                         ),
                         modifier = Modifier
                             .clickable { onToggleHidePanNumbers() }
@@ -137,14 +138,14 @@ fun AllotmentOverviewBannerCard(
                             Icon(
                                 imageVector = if (hidePanNumbers) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                                 contentDescription = null,
-                                tint = if (hidePanNumbers) Color(0xFF34D399) else Color(0xFF38BDF8),
+                                tint = if (hidePanNumbers) MaterialTheme.ipo.gain else MaterialTheme.ipo.info,
                                 modifier = Modifier.size(15.dp)
                             )
                             Spacer(modifier = Modifier.width(5.dp))
                             Text(
                                 text = if (hidePanNumbers) "PANs Hidden" else "Hide PANs",
                                 style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                color = Color.White
+                                color = MaterialTheme.ipo.onPanel
                             )
                         }
                     }
@@ -159,25 +160,25 @@ fun AllotmentOverviewBannerCard(
                     OverviewStatPill(
                         label = "Saved PANs",
                         value = totalSavedPans.toString(),
-                        accent = Color(0xFF38BDF8),
+                        accent = MaterialTheme.ipo.info,
                         modifier = Modifier.weight(1f)
                     )
                     OverviewStatPill(
                         label = "Applied IPOs",
                         value = totalAppliedIpos.toString(),
-                        accent = Color(0xFFFBBF24),
+                        accent = MaterialTheme.ipo.warning,
                         modifier = Modifier.weight(1f)
                     )
                     OverviewStatPill(
                         label = "Allotted",
                         value = allottedBids.toString(),
-                        accent = Color(0xFF34D399),
+                        accent = MaterialTheme.ipo.gain,
                         modifier = Modifier.weight(1f)
                     )
                     OverviewStatPill(
                         label = "Mandates",
                         value = if (pendingMandates > 0) "$pendingMandates Pend" else "₹${activeBlockedInr / 1000}K",
-                        accent = Color(0xFFA78BFA),
+                        accent = MaterialTheme.ipo.accent,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -195,7 +196,7 @@ private fun OverviewStatPill(
 ) {
     Surface(
         modifier = modifier,
-        color = Color(0x880B182E),
+        color = MaterialTheme.ipo.panelVariant.copy(alpha = 0.6f),
         shape = RoundedCornerShape(12.dp),
         border = BorderStroke(1.dp, accent.copy(alpha = 0.35f))
     ) {
@@ -212,7 +213,7 @@ private fun OverviewStatPill(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFFCBD5E1),
+                color = MaterialTheme.ipo.onPanel,
                 maxLines = 1
             )
         }
@@ -309,8 +310,8 @@ fun SwipeToConfirmApplyBar(
     var sliderProgress by remember { mutableFloatStateOf(0f) }
     var confirmed by remember { mutableStateOf(false) }
 
-    val accentColor = if (isPreApply) Color(0xFFF59E0B) else Color(0xFF10B981)
-    val bgColor = if (isPreApply) Color(0xFF451A03).copy(alpha = 0.65f) else Color(0xFF064E3B).copy(alpha = 0.65f)
+    val accentColor = if (isPreApply) MaterialTheme.ipo.warning else MaterialTheme.ipo.gain
+    val bgColor = if (isPreApply) MaterialTheme.ipo.warningContainer.copy(alpha = 0.65f) else MaterialTheme.ipo.gainContainer.copy(alpha = 0.65f)
 
     Surface(
         modifier = modifier
@@ -353,7 +354,7 @@ fun SwipeToConfirmApplyBar(
                         Text(
                             text = if (confirmed) "Application Confirmed!" else label,
                             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.ExtraBold),
-                            color = Color.White
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = if (isPreApply) {
@@ -362,7 +363,7 @@ fun SwipeToConfirmApplyBar(
                                 "Slide right (or tap Confirm) to prevent accidental bids"
                             },
                             style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFFCBD5E1)
+                            color = MaterialTheme.ipo.onPanel
                         )
                     }
                 }
@@ -375,7 +376,7 @@ fun SwipeToConfirmApplyBar(
                     },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = accentColor,
-                        contentColor = Color(0xFF031B14)
+                        contentColor = MaterialTheme.ipo.onGain
                     ),
                     shape = RoundedCornerShape(10.dp),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
@@ -407,7 +408,7 @@ fun SwipeToConfirmApplyBar(
                 colors = SliderDefaults.colors(
                     thumbColor = accentColor,
                     activeTrackColor = accentColor,
-                    inactiveTrackColor = Color(0xFF1E293B)
+                    inactiveTrackColor = MaterialTheme.ipo.panelVariant
                 ),
                 modifier = Modifier
                     .fillMaxWidth()

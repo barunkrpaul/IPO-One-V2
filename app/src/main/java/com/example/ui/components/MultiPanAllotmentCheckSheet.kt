@@ -1,5 +1,6 @@
 package com.example.ui.components
 
+import com.example.ui.theme.ipo
 import android.content.Context
 import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
@@ -359,8 +360,8 @@ fun MultiPanAllotmentCheckModalSheet(
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
-                                Color(0xFF071326),
-                                Color(0xFF0D1F3C)
+                                MaterialTheme.ipo.panel,
+                                MaterialTheme.ipo.panelVariant
                             )
                         )
                     )
@@ -402,13 +403,13 @@ fun MultiPanAllotmentCheckModalSheet(
                                 }
 
                                 Surface(
-                                    color = Color(0xFF1E293B),
+                                    color = MaterialTheme.ipo.panelVariant,
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
                                     Text(
                                         text = "${appliedIpo.category} • ₹${appliedIpo.issuePrice} • $lotShares Sh/Lot",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = Color(0xFFCBD5E1),
+                                        color = MaterialTheme.ipo.onPanel,
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                     )
                                 }
@@ -419,7 +420,7 @@ fun MultiPanAllotmentCheckModalSheet(
                             Text(
                                 text = appliedIpo.ipoName,
                                 style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold),
-                                color = Color.White,
+                                color = MaterialTheme.ipo.onPanel,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -433,7 +434,7 @@ fun MultiPanAllotmentCheckModalSheet(
                                     "All $totalPans saved PAN card(s) auto-checked • Filter, Share or Verify below"
                                 },
                                 style = MaterialTheme.typography.bodySmall,
-                                color = if (isAutoChecking) Color(0xFF38BDF8) else Color(0xFF94A3B8)
+                                color = if (isAutoChecking) MaterialTheme.ipo.info else MaterialTheme.ipo.onPanelMuted
                             )
                         }
 
@@ -447,13 +448,13 @@ fun MultiPanAllotmentCheckModalSheet(
                                 modifier = Modifier
                                     .size(36.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0xFF1E293B))
+                                    .background(MaterialTheme.ipo.panelVariant)
                                     .testTag("sheet_toggle_hide_pan_button")
                             ) {
                                 Icon(
                                     imageVector = if (localHidePan) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                                     contentDescription = if (localHidePan) "Show PAN Numbers" else "Hide PAN Numbers",
-                                    tint = if (localHidePan) Color(0xFF38BDF8) else Color.White,
+                                    tint = if (localHidePan) MaterialTheme.ipo.info else MaterialTheme.ipo.onPanel,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -476,13 +477,13 @@ fun MultiPanAllotmentCheckModalSheet(
                                     modifier = Modifier
                                         .size(36.dp)
                                         .clip(CircleShape)
-                                        .background(Color(0xFF064E3B))
+                                        .background(MaterialTheme.ipo.gainContainer)
                                         .testTag("sheet_share_allotment_button")
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Share,
                                         contentDescription = "Share Allotment Summary",
-                                        tint = Color(0xFF34D399),
+                                        tint = MaterialTheme.ipo.gain,
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }
@@ -493,13 +494,13 @@ fun MultiPanAllotmentCheckModalSheet(
                                 modifier = Modifier
                                     .size(36.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0xFF1E293B))
+                                    .background(MaterialTheme.ipo.panelVariant)
                                     .testTag("close_multi_pan_sheet_button")
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Close,
                                     contentDescription = "Close Allotment Check",
-                                    tint = Color.White,
+                                    tint = MaterialTheme.ipo.onPanel,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -514,8 +515,8 @@ fun MultiPanAllotmentCheckModalSheet(
                                 .fillMaxWidth()
                                 .height(5.dp)
                                 .clip(RoundedCornerShape(3.dp)),
-                            color = Color(0xFF10B981),
-                            trackColor = Color(0xFF1E293B)
+                            color = MaterialTheme.ipo.gain,
+                            trackColor = MaterialTheme.ipo.panelVariant
                         )
                     }
 
@@ -530,7 +531,7 @@ fun MultiPanAllotmentCheckModalSheet(
                             title = "ALL PANS",
                             count = totalPans.toString(),
                             accentColor = Color(0xFF38BDF8),
-                            containerColor = Color(0xFF0F243C),
+                            containerColor = MaterialTheme.ipo.infoContainer,
                             isSelected = resultFilter == PanResultFilter.ALL,
                             onClick = { resultFilter = PanResultFilter.ALL },
                             modifier = Modifier.weight(1f)
@@ -539,7 +540,7 @@ fun MultiPanAllotmentCheckModalSheet(
                             title = "ALLOTTED",
                             count = allottedCount.toString(),
                             accentColor = Color(0xFF10B981),
-                            containerColor = Color(0xFF063229),
+                            containerColor = MaterialTheme.ipo.gainContainer,
                             isSelected = resultFilter == PanResultFilter.ALLOTTED,
                             onClick = { resultFilter = PanResultFilter.ALLOTTED },
                             modifier = Modifier.weight(1f)
@@ -548,7 +549,7 @@ fun MultiPanAllotmentCheckModalSheet(
                             title = "NOT ALLOTTED",
                             count = notAllottedCount.toString(),
                             accentColor = Color(0xFFF87171),
-                            containerColor = Color(0xFF3B1219),
+                            containerColor = MaterialTheme.ipo.lossContainer,
                             isSelected = resultFilter == PanResultFilter.NOT_ALLOTTED,
                             onClick = { resultFilter = PanResultFilter.NOT_ALLOTTED },
                             modifier = Modifier.weight(1f)
@@ -591,8 +592,8 @@ fun MultiPanAllotmentCheckModalSheet(
                             onClick = { recheckTrigger++ },
                             enabled = !isAutoChecking && totalPans > 0,
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF10B981),
-                                contentColor = Color(0xFF031B14)
+                                containerColor = MaterialTheme.ipo.gain,
+                                contentColor = MaterialTheme.ipo.onGain
                             ),
                             shape = RoundedCornerShape(12.dp),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
@@ -628,7 +629,7 @@ fun MultiPanAllotmentCheckModalSheet(
                                     )
                                 },
                                 shape = RoundedCornerShape(12.dp),
-                                border = BorderStroke(1.dp, Color(0xFF34D399)),
+                                border = BorderStroke(1.dp, MaterialTheme.ipo.gain),
                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                                 modifier = Modifier
                                     .height(40.dp)
@@ -637,14 +638,14 @@ fun MultiPanAllotmentCheckModalSheet(
                                 Icon(
                                     imageVector = Icons.Default.Share,
                                     contentDescription = null,
-                                    tint = Color(0xFF34D399),
+                                    tint = MaterialTheme.ipo.gain,
                                     modifier = Modifier.size(15.dp)
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                     text = "Share",
                                     style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                                    color = Color(0xFF34D399)
+                                    color = MaterialTheme.ipo.gain
                                 )
                             }
                         }
@@ -652,7 +653,7 @@ fun MultiPanAllotmentCheckModalSheet(
                         OutlinedButton(
                             onClick = { showInlineAddPan = !showInlineAddPan },
                             shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, Color(0xFF38BDF8)),
+                            border = BorderStroke(1.dp, MaterialTheme.ipo.info),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                             modifier = Modifier
                                 .height(40.dp)
@@ -661,14 +662,14 @@ fun MultiPanAllotmentCheckModalSheet(
                             Icon(
                                 imageVector = Icons.Default.Add,
                                 contentDescription = null,
-                                tint = Color(0xFF38BDF8),
+                                tint = MaterialTheme.ipo.info,
                                 modifier = Modifier.size(15.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = if (showInlineAddPan) "Hide" else "+ Add PAN",
                                 style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                                color = Color(0xFF38BDF8)
+                                color = MaterialTheme.ipo.info
                             )
                         }
                     }
@@ -798,8 +799,8 @@ fun MultiPanAllotmentCheckModalSheet(
                                 onClick = { resultFilter = PanResultFilter.ALLOTTED },
                                 label = { Text("Allotted ($allottedCount)") },
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = Color(0xFF064E3B),
-                                    selectedLabelColor = Color(0xFF34D399)
+                                    selectedContainerColor = MaterialTheme.ipo.gainContainer,
+                                    selectedLabelColor = MaterialTheme.ipo.gain
                                 ),
                                 modifier = Modifier.testTag("filter_pan_allotted")
                             )
@@ -808,8 +809,8 @@ fun MultiPanAllotmentCheckModalSheet(
                                 onClick = { resultFilter = PanResultFilter.NOT_ALLOTTED },
                                 label = { Text("Not Allotted ($notAllottedCount)") },
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = Color(0xFF450A0A),
-                                    selectedLabelColor = Color(0xFFFCA5A5)
+                                    selectedContainerColor = MaterialTheme.ipo.lossContainer,
+                                    selectedLabelColor = MaterialTheme.ipo.onLossContainer
                                 ),
                                 modifier = Modifier.testTag("filter_pan_not_allotted")
                             )
@@ -993,7 +994,7 @@ private fun AllotmentSummaryStatBox(
             Text(
                 text = title,
                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                color = Color(0xFFCBD5E1),
+                color = MaterialTheme.ipo.onPanel,
                 maxLines = 1
             )
         }
@@ -1013,16 +1014,16 @@ fun NaradaStylePanResultCard(
     onOpenRegistrarPortal: () -> Unit
 ) {
     val borderColor = when (status) {
-        PanAllotmentStatus.ALLOTTED -> Color(0xFF10B981).copy(alpha = 0.55f)
-        PanAllotmentStatus.NOT_ALLOTTED -> Color(0xFFF87171).copy(alpha = 0.45f)
-        PanAllotmentStatus.CHECKING -> Color(0xFF38BDF8).copy(alpha = 0.4f)
-        PanAllotmentStatus.UNVERIFIED -> Color(0xFF94A3B8).copy(alpha = 0.4f)
+        PanAllotmentStatus.ALLOTTED -> MaterialTheme.ipo.gain.copy(alpha = 0.55f)
+        PanAllotmentStatus.NOT_ALLOTTED -> MaterialTheme.ipo.loss.copy(alpha = 0.45f)
+        PanAllotmentStatus.CHECKING -> MaterialTheme.ipo.info.copy(alpha = 0.4f)
+        PanAllotmentStatus.UNVERIFIED -> MaterialTheme.ipo.onPanelMuted.copy(alpha = 0.4f)
     }
     val cardBg = when (status) {
-        PanAllotmentStatus.ALLOTTED -> Color(0xFF062E24)
-        PanAllotmentStatus.NOT_ALLOTTED -> Color(0xFF1F1218)
-        PanAllotmentStatus.CHECKING -> Color(0xFF0F1E36)
-        PanAllotmentStatus.UNVERIFIED -> Color(0xFF151C28)
+        PanAllotmentStatus.ALLOTTED -> MaterialTheme.ipo.gainContainer
+        PanAllotmentStatus.NOT_ALLOTTED -> MaterialTheme.ipo.lossContainer
+        PanAllotmentStatus.CHECKING -> MaterialTheme.ipo.panelVariant
+        PanAllotmentStatus.UNVERIFIED -> MaterialTheme.ipo.panelVariant
     }
 
     Card(
@@ -1054,10 +1055,10 @@ fun NaradaStylePanResultCard(
                             .clip(CircleShape)
                             .background(
                                 when (status) {
-                                    PanAllotmentStatus.ALLOTTED -> Color(0xFF10B981).copy(alpha = 0.2f)
-                                    PanAllotmentStatus.NOT_ALLOTTED -> Color(0xFFF87171).copy(alpha = 0.2f)
-                                    PanAllotmentStatus.CHECKING -> Color(0xFF38BDF8).copy(alpha = 0.2f)
-                                    PanAllotmentStatus.UNVERIFIED -> Color(0xFF94A3B8).copy(alpha = 0.2f)
+                                    PanAllotmentStatus.ALLOTTED -> MaterialTheme.ipo.gain.copy(alpha = 0.2f)
+                                    PanAllotmentStatus.NOT_ALLOTTED -> MaterialTheme.ipo.loss.copy(alpha = 0.2f)
+                                    PanAllotmentStatus.CHECKING -> MaterialTheme.ipo.info.copy(alpha = 0.2f)
+                                    PanAllotmentStatus.UNVERIFIED -> MaterialTheme.ipo.onPanelMuted.copy(alpha = 0.2f)
                                 }
                             ),
                         contentAlignment = Alignment.Center
@@ -1066,10 +1067,10 @@ fun NaradaStylePanResultCard(
                             text = panProfile.holderName.trim().take(1).uppercase().ifEmpty { "$index" },
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
                             color = when (status) {
-                                PanAllotmentStatus.ALLOTTED -> Color(0xFF34D399)
-                                PanAllotmentStatus.NOT_ALLOTTED -> Color(0xFFF87171)
-                                PanAllotmentStatus.CHECKING -> Color(0xFF38BDF8)
-                                PanAllotmentStatus.UNVERIFIED -> Color(0xFF94A3B8)
+                                PanAllotmentStatus.ALLOTTED -> MaterialTheme.ipo.gain
+                                PanAllotmentStatus.NOT_ALLOTTED -> MaterialTheme.ipo.loss
+                                PanAllotmentStatus.CHECKING -> MaterialTheme.ipo.info
+                                PanAllotmentStatus.UNVERIFIED -> MaterialTheme.ipo.onPanelMuted
                             }
                         )
                     }
@@ -1080,7 +1081,7 @@ fun NaradaStylePanResultCard(
                         Text(
                             text = panProfile.holderName,
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -1090,9 +1091,9 @@ fun NaradaStylePanResultCard(
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Surface(
-                                color = Color(0xFF0A1426),
+                                color = MaterialTheme.ipo.panel,
                                 shape = RoundedCornerShape(6.dp),
-                                border = BorderStroke(1.dp, Color(0xFF334155))
+                                border = BorderStroke(1.dp, MaterialTheme.ipo.panelBorder)
                             ) {
                                 Text(
                                     text = maskPanNumber(panProfile.panNumber, hidePan),
@@ -1100,14 +1101,14 @@ fun NaradaStylePanResultCard(
                                         fontFamily = FontFamily.Monospace,
                                         fontWeight = FontWeight.Bold
                                     ),
-                                    color = Color(0xFF38BDF8),
+                                    color = MaterialTheme.ipo.info,
                                     modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                                 )
                             }
                             Text(
                                 text = panProfile.category,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = Color(0xFF94A3B8)
+                                color = MaterialTheme.ipo.onPanelMuted
                             )
                         }
                     }
@@ -1119,9 +1120,9 @@ fun NaradaStylePanResultCard(
                 when (status) {
                     PanAllotmentStatus.CHECKING -> {
                         Surface(
-                            color = Color(0xFF0C2744),
+                            color = MaterialTheme.ipo.infoContainer,
                             shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, Color(0xFF38BDF8).copy(alpha = 0.5f))
+                            border = BorderStroke(1.dp, MaterialTheme.ipo.info.copy(alpha = 0.5f))
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -1130,13 +1131,13 @@ fun NaradaStylePanResultCard(
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(14.dp),
                                     strokeWidth = 2.dp,
-                                    color = Color(0xFF38BDF8)
+                                    color = MaterialTheme.ipo.info
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = "Checking...",
                                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = Color(0xFF38BDF8)
+                                    color = MaterialTheme.ipo.info
                                 )
                             }
                         }
@@ -1144,7 +1145,7 @@ fun NaradaStylePanResultCard(
 
                     PanAllotmentStatus.ALLOTTED -> {
                         Surface(
-                            color = Color(0xFF059669),
+                            color = MaterialTheme.ipo.gainStrong,
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier
                                 .clickable { onToggleStatus() }
@@ -1172,7 +1173,7 @@ fun NaradaStylePanResultCard(
 
                     PanAllotmentStatus.UNVERIFIED -> {
                         Surface(
-                            color = Color(0xFF334155),
+                            color = MaterialTheme.ipo.panelBorder,
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier
                                 .clickable { onToggleStatus() }
@@ -1181,7 +1182,7 @@ fun NaradaStylePanResultCard(
                             Text(
                                 text = "COULD NOT VERIFY",
                                 style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.ExtraBold),
-                                color = Color(0xFFE2E8F0),
+                                color = MaterialTheme.ipo.onPanel,
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                             )
                         }
@@ -1189,7 +1190,7 @@ fun NaradaStylePanResultCard(
 
                     PanAllotmentStatus.NOT_ALLOTTED -> {
                         Surface(
-                            color = Color(0xFF991B1B),
+                            color = MaterialTheme.ipo.lossStrong,
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier
                                 .clickable { onToggleStatus() }
@@ -1202,7 +1203,7 @@ fun NaradaStylePanResultCard(
                                 Icon(
                                     imageVector = Icons.Default.Cancel,
                                     contentDescription = "Not Allotted",
-                                    tint = Color(0xFFFECACA),
+                                    tint = MaterialTheme.ipo.onLossContainer,
                                     modifier = Modifier.size(15.dp)
                                 )
                                 Spacer(modifier = Modifier.width(5.dp))
@@ -1218,7 +1219,7 @@ fun NaradaStylePanResultCard(
             }
 
             Spacer(modifier = Modifier.height(10.dp))
-            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
             Spacer(modifier = Modifier.height(8.dp))
 
             // Bottom Detail Row: Shares Allotted + Live Registrar Portal Verification Link
@@ -1240,10 +1241,10 @@ fun NaradaStylePanResultCard(
                     },
                     style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
                     color = when (status) {
-                        PanAllotmentStatus.ALLOTTED -> Color(0xFF6EE7B7)
-                        PanAllotmentStatus.NOT_ALLOTTED -> Color(0xFFFCA5A5)
-                        PanAllotmentStatus.CHECKING -> Color(0xFF94A3B8)
-                        PanAllotmentStatus.UNVERIFIED -> Color(0xFFCBD5E1)
+                        PanAllotmentStatus.ALLOTTED -> MaterialTheme.ipo.onGainContainer
+                        PanAllotmentStatus.NOT_ALLOTTED -> MaterialTheme.ipo.onLossContainer
+                        PanAllotmentStatus.CHECKING -> MaterialTheme.ipo.onPanelMuted
+                        PanAllotmentStatus.UNVERIFIED -> MaterialTheme.ipo.onPanel
                     },
                     modifier = Modifier.weight(1f)
                 )
@@ -1253,7 +1254,7 @@ fun NaradaStylePanResultCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Surface(
-                        color = Color.White.copy(alpha = 0.08f),
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.clickable { onToggleStatus() }
                     ) {
@@ -1264,14 +1265,14 @@ fun NaradaStylePanResultCard(
                             Icon(
                                 imageVector = Icons.Default.Sync,
                                 contentDescription = "Toggle status",
-                                tint = Color(0xFFCBD5E1),
+                                tint = MaterialTheme.ipo.onPanel,
                                 modifier = Modifier.size(12.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = "Switch",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = Color(0xFFCBD5E1)
+                                color = MaterialTheme.ipo.onPanel
                             )
                         }
                     }

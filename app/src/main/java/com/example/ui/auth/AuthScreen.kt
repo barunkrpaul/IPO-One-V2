@@ -1,5 +1,6 @@
 package com.example.ui.auth
 
+import com.example.ui.theme.ipo
 import android.app.Activity
 import android.content.Context
 import android.util.Log
@@ -220,9 +221,9 @@ fun AuthScreen(
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color(0xFF060D1D),
-                        Color(0xFF0C1A36),
-                        Color(0xFF071E22)
+                        MaterialTheme.ipo.panel,
+                        MaterialTheme.ipo.panelVariant,
+                        MaterialTheme.ipo.gainContainer
                     )
                 )
             )
@@ -298,7 +299,7 @@ fun AuthScreen(
                             Text(
                                 text = "Real-Time Mainboard & SME GMP, QIB/HNI/Retail Subscription & Biometric PAN Vault",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = Color(0xFFCBD5E1)
+                                color = MaterialTheme.ipo.onPanel
                             )
                         }
                     }

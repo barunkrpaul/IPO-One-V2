@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import com.example.ui.theme.ipo
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
@@ -355,8 +356,8 @@ private fun DirectoryList(
 
 @Composable
 private fun gainColor(pct: Double): Color = when {
-    pct > 0 -> Color(0xFF34D399)
-    pct < 0 -> Color(0xFFF87171)
+    pct > 0 -> MaterialTheme.ipo.gain
+    pct < 0 -> MaterialTheme.ipo.loss
     else -> MaterialTheme.colorScheme.onSurfaceVariant
 }
 

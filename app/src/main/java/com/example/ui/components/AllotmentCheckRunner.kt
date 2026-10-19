@@ -1,5 +1,6 @@
 package com.example.ui.components
 
+import com.example.ui.theme.ipo
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.webkit.WebResourceError
@@ -380,25 +381,25 @@ private fun RunnerHeader(
     total: Int,
     onClose: () -> Unit
 ) {
-    Surface(color = Color(0xFF071122), modifier = Modifier.fillMaxWidth()) {
+    Surface(color = MaterialTheme.ipo.panel, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = stringResource(R.string.runner_title, ipoName),
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = Color.White,
+                        color = MaterialTheme.ipo.onPanel,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = stringResource(R.string.runner_subtitle, registrar.fullName, done, total),
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF94A3B8)
+                        color = MaterialTheme.ipo.onPanelMuted
                     )
                 }
                 IconButton(onClick = onClose, modifier = Modifier.testTag("runner_close")) {
-                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.runner_close), tint = Color.White)
+                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.runner_close), tint = MaterialTheme.ipo.onPanel)
                 }
             }
             if (total > 0) {
@@ -442,8 +443,8 @@ private fun RunnerStatusBar(
                 text = message,
                 style = MaterialTheme.typography.bodySmall,
                 color = when (outcome?.result) {
-                    AllotmentResult.ALLOTTED -> Color(0xFF34D399)
-                    AllotmentResult.NOT_ALLOTTED -> Color(0xFFF87171)
+                    AllotmentResult.ALLOTTED -> MaterialTheme.ipo.gain
+                    AllotmentResult.NOT_ALLOTTED -> MaterialTheme.ipo.loss
                     else -> MaterialTheme.colorScheme.primary
                 },
                 modifier = Modifier.testTag("runner_status")
@@ -477,7 +478,7 @@ private fun RunnerActions(
         Spacer(modifier = Modifier.weight(1f))
         if (phase == RunnerPhase.WAITING_FOR_USER || phase == RunnerPhase.READING) {
             OutlinedButton(onClick = onNotAllotted, modifier = Modifier.testTag("runner_mark_not_allotted")) {
-                Text(stringResource(R.string.runner_mark_not_allotted), color = Color(0xFFF87171))
+                Text(stringResource(R.string.runner_mark_not_allotted), color = MaterialTheme.ipo.loss)
             }
             Button(onClick = onAllotted, modifier = Modifier.testTag("runner_mark_allotted")) {
                 Text(stringResource(R.string.runner_mark_allotted))
@@ -546,8 +547,8 @@ private fun RunnerSummary(
                             text = allotmentResultLabel(result, outcome?.sharesAllotted),
                             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
                             color = when (result) {
-                                AllotmentResult.ALLOTTED -> Color(0xFF34D399)
-                                AllotmentResult.NOT_ALLOTTED -> Color(0xFFF87171)
+                                AllotmentResult.ALLOTTED -> MaterialTheme.ipo.gain
+                                AllotmentResult.NOT_ALLOTTED -> MaterialTheme.ipo.loss
                                 AllotmentResult.UNVERIFIED -> MaterialTheme.colorScheme.onSurfaceVariant
                             }
                         )

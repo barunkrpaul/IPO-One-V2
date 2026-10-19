@@ -1,5 +1,6 @@
 package com.example.ui.components
 
+import com.example.ui.theme.ipo
 import android.annotation.SuppressLint
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -260,7 +261,7 @@ fun RegistrarVerificationModalSheet(
         ) {
             // Header Bar
             Surface(
-                color = Color(0xFF071122),
+                color = MaterialTheme.ipo.panel,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
@@ -296,7 +297,7 @@ fun RegistrarVerificationModalSheet(
                                 Text(
                                     text = "Direct Registrar Allotment Check",
                                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = Color.White
+                                    color = MaterialTheme.ipo.onPanel
                                 )
                                 Text(
                                     text = if (request.ipoName.isNotBlank()) {
@@ -305,7 +306,7 @@ fun RegistrarVerificationModalSheet(
                                         activeRegistrar.fullName
                                     },
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = Color(0xFF94A3B8),
+                                    color = MaterialTheme.ipo.onPanelMuted,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -320,7 +321,7 @@ fun RegistrarVerificationModalSheet(
                                 Icon(
                                     imageVector = Icons.Default.Refresh,
                                     contentDescription = "Reload Portal",
-                                    tint = Color(0xFFCBD5E1),
+                                    tint = MaterialTheme.ipo.onPanel,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -350,7 +351,7 @@ fun RegistrarVerificationModalSheet(
                                 Icon(
                                     imageVector = Icons.Default.Close,
                                     contentDescription = "Close",
-                                    tint = Color.White,
+                                    tint = MaterialTheme.ipo.onPanel,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -393,7 +394,7 @@ fun RegistrarVerificationModalSheet(
                     if (request.panNumber.isNotBlank()) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Surface(
-                            color = Color(0xFF0F1E36),
+                            color = MaterialTheme.ipo.panelVariant,
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -414,7 +415,7 @@ fun RegistrarVerificationModalSheet(
                                     Text(
                                         text = "${request.holderName} • PAN: ${request.panNumber.uppercase()}",
                                         style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                                        color = Color.White
+                                        color = MaterialTheme.ipo.onPanel
                                     )
                                     Text(
                                         text = autoFillStatus,
@@ -569,7 +570,7 @@ fun RegistrarVerificationModalSheet(
             val trackedApp = request.application
             if (trackedApp != null && onUpdateApplicationStatus != null) {
                 Surface(
-                    color = Color(0xFF071122),
+                    color = MaterialTheme.ipo.panel,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -583,14 +584,14 @@ fun RegistrarVerificationModalSheet(
                             Text(
                                 text = "Update ${trackedApp.ipoName} Status",
                                 style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                                color = Color.White,
+                                color = MaterialTheme.ipo.onPanel,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
                                 text = "Current: ${trackedApp.status}",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Color(0xFF94A3B8)
+                                color = MaterialTheme.ipo.onPanelMuted
                             )
                         }
 
@@ -601,8 +602,8 @@ fun RegistrarVerificationModalSheet(
                                     onDismiss()
                                 },
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF065F46),
-                                    contentColor = Color(0xFF6EE7B7)
+                                    containerColor = MaterialTheme.ipo.gainContainer,
+                                    contentColor = MaterialTheme.ipo.onGainContainer
                                 ),
                                 modifier = Modifier.testTag("verifier_mark_allotted_button")
                             ) {
@@ -622,7 +623,7 @@ fun RegistrarVerificationModalSheet(
                                 },
                                 modifier = Modifier.testTag("verifier_mark_not_allotted_button")
                             ) {
-                                Text("Not Allotted", color = Color(0xFFF87171))
+                                Text("Not Allotted", color = MaterialTheme.ipo.loss)
                             }
                         }
                     }

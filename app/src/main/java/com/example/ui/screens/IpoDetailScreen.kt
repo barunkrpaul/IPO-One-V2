@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import com.example.ui.theme.ipo
 import android.content.Intent
 import android.net.Uri
 import android.text.format.DateUtils
@@ -968,8 +969,8 @@ private fun MyApplicationsSheet(
                             text = app.status,
                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                             color = when (app.status) {
-                                "Allotted" -> Color(0xFF34D399)
-                                "Not Allotted" -> Color(0xFFF87171)
+                                "Allotted" -> MaterialTheme.ipo.gain
+                                "Not Allotted" -> MaterialTheme.ipo.loss
                                 else -> MaterialTheme.colorScheme.secondary
                             }
                         )

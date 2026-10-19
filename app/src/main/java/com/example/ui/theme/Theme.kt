@@ -8,6 +8,7 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
@@ -35,51 +36,65 @@ val JetBrainsMonoFamily = FontFamily(
     Font(R.font.jetbrains_mono, FontWeight.Bold)
 )
 
-val EmeraldBull = Color(0xFF00E676)
-val EmeraldContainer = Color(0xFF073B2A)
-val GoldContainer = Color(0xFF3B2E08)
-val NavyBackground = Color(0xFF070E1E)
-val NavySurfaceVariant = Color(0xFF172645)
-val CoralBear = Color(0xFFFF5252)
-
+// "Ink & Jade": deep ink surfaces, jade for gains, amber and sky as accents
 private val DarkColorPalette = darkColorScheme(
-    primary = EmeraldBull,
-    onPrimary = Color(0xFF002912),
-    primaryContainer = EmeraldContainer,
-    onPrimaryContainer = Color(0xFF80FFBC),
-    secondary = GoldAccent,
-    onSecondary = Color(0xFF2B2000),
-    secondaryContainer = GoldContainer,
-    onSecondaryContainer = Color(0xFFFFE599),
-    tertiary = Color(0xFF38BDF8),
+    primary = Color(0xFF34D399),
+    onPrimary = Color(0xFF00291B),
+    primaryContainer = Color(0xFF0D3B2E),
+    onPrimaryContainer = Color(0xFFA7F3D0),
+    secondary = Color(0xFFFBBF24),
+    onSecondary = Color(0xFF2B1D00),
+    secondaryContainer = Color(0xFF3A2C0A),
+    onSecondaryContainer = Color(0xFFFDE68A),
+    tertiary = Color(0xFF7DD3FC),
     onTertiary = Color(0xFF00263B),
-    background = NavyBackground,
-    onBackground = Color(0xFFEEF4FF),
-    surface = NavySurface,
-    onSurface = Color(0xFFEEF4FF),
-    surfaceVariant = NavySurfaceVariant,
-    onSurfaceVariant = Color(0xFFB0C2E0),
-    error = CoralBear,
-    outline = Color(0xFF2B3E63)
+    tertiaryContainer = Color(0xFF0C2D48),
+    onTertiaryContainer = Color(0xFFBAE6FD),
+    background = Color(0xFF0B1020),
+    onBackground = Color(0xFFE6ECF7),
+    surface = Color(0xFF121A2E),
+    onSurface = Color(0xFFE6ECF7),
+    surfaceVariant = Color(0xFF1A2440),
+    onSurfaceVariant = Color(0xFF9AA8C3),
+    surfaceContainerLowest = Color(0xFF0B1020),
+    surfaceContainerLow = Color(0xFF0F1628),
+    surfaceContainer = Color(0xFF121A2E),
+    surfaceContainerHigh = Color(0xFF172036),
+    surfaceContainerHighest = Color(0xFF1C2640),
+    error = Color(0xFFF87171),
+    onError = Color(0xFF3B0A0A),
+    outline = Color(0xFF2A3654),
+    outlineVariant = Color(0xFF222C46)
 )
 
 private val LightColorPalette = lightColorScheme(
-    primary = Color(0xFF008744),
+    primary = Color(0xFF047857),
     onPrimary = Color.White,
     primaryContainer = Color(0xFFD1FAE5),
-    onPrimaryContainer = Color(0xFF022C22),
+    onPrimaryContainer = Color(0xFF064E3B),
     secondary = Color(0xFFB45309),
     onSecondary = Color.White,
     secondaryContainer = Color(0xFFFEF3C7),
-    onSecondaryContainer = Color(0xFF451A03),
-    tertiary = Color(0xFF0284C7),
-    background = Color(0xFFF4F7FB),
-    onBackground = Color(0xFF0B1528),
+    onSecondaryContainer = Color(0xFF78350F),
+    tertiary = Color(0xFF0369A1),
+    onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFE0F2FE),
+    onTertiaryContainer = Color(0xFF0C4A6E),
+    background = Color(0xFFF5F7FB),
+    onBackground = Color(0xFF0F172A),
     surface = Color.White,
-    onSurface = Color(0xFF0B1528),
-    surfaceVariant = Color(0xFFE5ECF6),
-    onSurfaceVariant = Color(0xFF475569),
-    error = Color(0xFFDC2626)
+    onSurface = Color(0xFF0F172A),
+    surfaceVariant = Color(0xFFEDF1F7),
+    onSurfaceVariant = Color(0xFF5B6B85),
+    surfaceContainerLowest = Color.White,
+    surfaceContainerLow = Color(0xFFF8FAFC),
+    surfaceContainer = Color(0xFFF2F5F9),
+    surfaceContainerHigh = Color(0xFFECF0F6),
+    surfaceContainerHighest = Color(0xFFE6EBF2),
+    error = Color(0xFFDC2626),
+    onError = Color.White,
+    outline = Color(0xFFCBD5E1),
+    outlineVariant = Color(0xFFE2E8F0)
 )
 
 val AppTypography = Typography(
@@ -144,7 +159,13 @@ private val BlackColorPalette = DarkColorPalette.copy(
     background = Color.Black,
     surface = Color(0xFF0A0A0A),
     surfaceVariant = Color(0xFF161616),
-    outline = Color(0xFF2A2A2A)
+    surfaceContainerLowest = Color.Black,
+    surfaceContainerLow = Color(0xFF050505),
+    surfaceContainer = Color(0xFF0A0A0A),
+    surfaceContainerHigh = Color(0xFF111111),
+    surfaceContainerHighest = Color(0xFF161616),
+    outline = Color(0xFF2A2A2A),
+    outlineVariant = Color(0xFF1F1F1F)
 )
 
 /** [themeMode] (from Settings) takes precedence over [darkTheme] when given. */
@@ -161,9 +182,24 @@ fun IpoOneTheme(
         ThemeMode.BLACK -> BlackColorPalette
         null -> if (darkTheme) DarkColorPalette else LightColorPalette
     }
-    MaterialTheme(
-        colorScheme = colors,
-        typography = AppTypography,
-        content = content
-    )
+    val ipoColors = when {
+        colors == LightColorPalette -> LightIpoColors
+        colors == BlackColorPalette -> BlackIpoColors
+        else -> DarkIpoColors
+    }
+    CompositionLocalProvider(LocalIpoColors provides ipoColors) {
+        MaterialTheme(
+            colorScheme = colors,
+            typography = AppTypography,
+            content = content
+        )
+    }
+}
+
+/** Keeps a block dark in every theme, e.g. text laid over the dashboard's hero photo. */
+@Composable
+fun AlwaysDarkSurface(content: @Composable () -> Unit) {
+    CompositionLocalProvider(LocalIpoColors provides DarkIpoColors) {
+        MaterialTheme(colorScheme = DarkColorPalette, typography = AppTypography, content = content)
+    }
 }

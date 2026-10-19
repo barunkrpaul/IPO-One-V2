@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import com.example.ui.theme.AlwaysDarkSurface
+import com.example.ui.theme.ipo
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.Image
@@ -179,101 +181,104 @@ fun MainDashboardScreen(
 
         // Live InvestorGain Header Banner
         item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-            ) {
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    Image(
-                        painter = painterResource(id = R.drawable.img_ipo_hero_banner),
-                        contentDescription = "Live IPO Market Dashboard",
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(175.dp),
-                        contentScale = ContentScale.Crop
-                    )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(175.dp)
-                            .background(
-                                Brush.verticalGradient(
-                                    listOf(Color(0x55060D1D), Color(0xEE060D1D))
-                                )
-                            )
-                            .padding(16.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Surface(
-                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                                    shape = RoundedCornerShape(50),
-                                    modifier = Modifier.border(
-                                        1.dp,
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
-                                        RoundedCornerShape(50)
+            // The banner sits on a photo, so it stays dark in every theme
+            AlwaysDarkSurface {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(22.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+                ) {
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        Image(
+                            painter = painterResource(id = R.drawable.img_ipo_hero_banner),
+                            contentDescription = "Live IPO Market Dashboard",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(175.dp),
+                            contentScale = ContentScale.Crop
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(175.dp)
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(Color(0x55060D1D), Color(0xEE060D1D))
                                     )
+                                )
+                                .padding(16.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(8.dp)
-                                                .clip(CircleShape)
-                                                .background(MaterialTheme.colorScheme.primary)
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                                        shape = RoundedCornerShape(50),
+                                        modifier = Modifier.border(
+                                            1.dp,
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                                            RoundedCornerShape(50)
                                         )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = "LIVE MARKET FEED",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.primary
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(8.dp)
+                                                    .clip(CircleShape)
+                                                    .background(MaterialTheme.colorScheme.primary)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = "LIVE MARKET FEED",
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
+
+                                    IconButton(
+                                        onClick = onRefresh,
+                                        modifier = Modifier
+                                            .size(38.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0x44FFFFFF))
+                                            .testTag("refresh_live_ipos_button")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Refresh,
+                                            contentDescription = "Refresh Live IPO Data",
+                                            tint = Color.White
                                         )
                                     }
                                 }
 
-                                IconButton(
-                                    onClick = onRefresh,
-                                    modifier = Modifier
-                                        .size(38.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0x44FFFFFF))
-                                        .testTag("refresh_live_ipos_button")
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Refresh,
-                                        contentDescription = "Refresh Live IPO Data",
-                                        tint = Color.White
-                                    )
-                                }
-                            }
-
-                            Column {
-                                if (topGmpItem != null) {
-                                    Text(
-                                        text = "Top GMP Today: ${topGmpItem.name} (+₹${formatDecimal(topGmpItem.gmpAmount)} / ${String.format("%.1f", topGmpItem.gmpPercent)}%)",
-                                        style = MaterialTheme.typography.labelLarge,
-                                        color = MaterialTheme.colorScheme.secondary
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                }
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    PulseStatChip("Open Now", openCount.toString(), Color(0xFF00E676), Modifier.weight(1f))
-                                    PulseStatChip("Upcoming", upcomingCount.toString(), Color(0xFFFFD54F), Modifier.weight(1f))
-                                    PulseStatChip("Allotment", closedCount.toString(), Color(0xFF38BDF8), Modifier.weight(1f))
-                                    PulseStatChip("Total Tracked", allList.size.toString(), Color.White, Modifier.weight(1f))
+                                Column {
+                                    if (topGmpItem != null) {
+                                        Text(
+                                            text = "Top GMP Today: ${topGmpItem.name} (+₹${formatDecimal(topGmpItem.gmpAmount)} / ${String.format("%.1f", topGmpItem.gmpPercent)}%)",
+                                            style = MaterialTheme.typography.labelLarge,
+                                            color = MaterialTheme.colorScheme.secondary
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                    }
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        PulseStatChip("Open Now", openCount.toString(), Color(0xFF00E676), Modifier.weight(1f))
+                                        PulseStatChip("Upcoming", upcomingCount.toString(), Color(0xFFFFD54F), Modifier.weight(1f))
+                                        PulseStatChip("Allotment", closedCount.toString(), Color(0xFF38BDF8), Modifier.weight(1f))
+                                        PulseStatChip("Total Tracked", allList.size.toString(), Color.White, Modifier.weight(1f))
+                                    }
                                 }
                             }
                         }
@@ -758,7 +763,7 @@ private fun PulseStatChip(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
-                color = Color(0xFFCBD5E1),
+                color = MaterialTheme.ipo.onPanel,
                 maxLines = 1
             )
         }
@@ -824,13 +829,13 @@ private fun LiveIpoCard(
                     }
                     if (stage == IpoLifecycleStage.UPCOMING && ipo.preApplyOpen == true) {
                         Surface(
-                            color = Color(0xFF0C4A6E),
+                            color = MaterialTheme.ipo.infoContainer,
                             shape = RoundedCornerShape(6.dp)
                         ) {
                             Text(
                                 text = stringResource(R.string.chip_pre_apply_open),
                                 style = MaterialTheme.typography.labelMedium,
-                                color = Color(0xFF7DD3FC),
+                                color = MaterialTheme.ipo.info,
                                 modifier = Modifier
                                     .padding(horizontal = 6.dp, vertical = 3.dp)
                                     .testTag("pre_apply_chip_${ipo.id}")
@@ -839,13 +844,13 @@ private fun LiveIpoCard(
                     }
                     if (ipo.hasAnchor) {
                         Surface(
-                            color = Color(0xFF064E3B),
+                            color = MaterialTheme.ipo.gainContainer,
                             shape = RoundedCornerShape(6.dp)
                         ) {
                             Text(
                                 text = "Anchor ✓",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = Color(0xFF6EE7B7),
+                                color = MaterialTheme.ipo.onGainContainer,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
                             )
                         }
@@ -857,7 +862,7 @@ private fun LiveIpoCard(
                         Icon(
                             imageVector = Icons.Default.LocalFireDepartment,
                             contentDescription = null,
-                            tint = Color(0xFFFF9800),
+                            tint = MaterialTheme.ipo.warning,
                             modifier = Modifier.size(16.dp)
                         )
                     }
@@ -988,9 +993,9 @@ private fun LiveIpoCard(
             if (onCheckAllotment != null) {
                 Spacer(modifier = Modifier.height(10.dp))
                 Surface(
-                    color = Color(0xFF064E3B).copy(alpha = 0.55f),
+                    color = MaterialTheme.ipo.gainContainer.copy(alpha = 0.55f),
                     shape = RoundedCornerShape(10.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.45f)),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.ipo.gain.copy(alpha = 0.45f)),
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { onCheckAllotment() }
@@ -1006,7 +1011,7 @@ private fun LiveIpoCard(
                         Icon(
                             imageVector = Icons.Default.FactCheck,
                             contentDescription = null,
-                            tint = Color(0xFF34D399),
+                            tint = MaterialTheme.ipo.gain,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
@@ -1017,7 +1022,7 @@ private fun LiveIpoCard(
                                 "Click to Check Allotment Status (Auto-Check Saved PANs)"
                             },
                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                            color = Color(0xFF6EE7B7),
+                            color = MaterialTheme.ipo.onGainContainer,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -1049,8 +1054,10 @@ private fun MiniMetric(
     }
 }
 
-private val GainGreen = Color(0xFF34D399)
-private val LossRed = Color(0xFFF87171)
+private val GainGreen: Color
+    @Composable get() = MaterialTheme.ipo.gain
+private val LossRed: Color
+    @Composable get() = MaterialTheme.ipo.loss
 
 @StringRes
 private fun stageTitleRes(stage: IpoLifecycleStage): Int = when (stage) {
@@ -1071,13 +1078,14 @@ private fun stageBadgeCode(stage: IpoLifecycleStage, statusCode: String): String
     IpoLifecycleStage.CANCELLED -> "X"
 }
 
+@Composable
 private fun stageAccent(stage: IpoLifecycleStage): Color = when (stage) {
-    IpoLifecycleStage.UPCOMING -> Color(0xFFFBBF24)
-    IpoLifecycleStage.OPEN -> Color(0xFF34D399)
-    IpoLifecycleStage.CLOSED -> Color(0xFF60A5FA)
-    IpoLifecycleStage.ALLOTTED -> Color(0xFFC084FC)
-    IpoLifecycleStage.LISTED -> Color(0xFF6EE7B7)
-    IpoLifecycleStage.CANCELLED -> Color(0xFFF87171)
+    IpoLifecycleStage.UPCOMING -> MaterialTheme.ipo.warning
+    IpoLifecycleStage.OPEN -> MaterialTheme.ipo.gain
+    IpoLifecycleStage.CLOSED -> MaterialTheme.ipo.info
+    IpoLifecycleStage.ALLOTTED -> MaterialTheme.ipo.accent
+    IpoLifecycleStage.LISTED -> MaterialTheme.ipo.gainStrong
+    IpoLifecycleStage.CANCELLED -> MaterialTheme.ipo.loss
 }
 
 @Composable
@@ -1217,9 +1225,11 @@ private fun ListedPerformanceLine(ipo: LiveIpoItem) {
         stringResource(R.string.listed_now, formatInr(currentPrice), formatSignedPercent(currentGain))
     } else null
     val neutral = MaterialTheme.colorScheme.onSurfaceVariant
+    val gain = MaterialTheme.ipo.gain
+    val loss = MaterialTheme.ipo.loss
     fun gainColor(pct: Double) = when {
-        pct > 0 -> GainGreen
-        pct < 0 -> LossRed
+        pct > 0 -> gain
+        pct < 0 -> loss
         else -> neutral
     }
 
@@ -1319,10 +1329,12 @@ private val ListedDateFormat = java.time.format.DateTimeFormatter.ofPattern("EEE
 @Composable
 private fun ListingPerformanceCard(performance: ListingPerformance, month: YearMonth) {
     val dash = stringResource(R.string.value_unavailable)
+    val gain = MaterialTheme.ipo.gain
+    val loss = MaterialTheme.ipo.loss
     fun pctColor(pct: Double?) = when {
         pct == null -> null
-        pct > 0 -> GainGreen
-        pct < 0 -> LossRed
+        pct > 0 -> gain
+        pct < 0 -> loss
         else -> null
     }
     Card(
@@ -1436,10 +1448,12 @@ private fun ListedYearChips(years: List<Int>, selected: Int?, onChange: (Int?) -
 @Composable
 private fun ListedHistoryCard(record: ListedIpoRecord, today: LocalDate, onClick: () -> Unit) {
     val neutral = MaterialTheme.colorScheme.onSurfaceVariant
+    val gain = MaterialTheme.ipo.gain
+    val loss = MaterialTheme.ipo.loss
     fun gainColor(pct: Double?) = when {
         pct == null -> neutral
-        pct > 0 -> GainGreen
-        pct < 0 -> LossRed
+        pct > 0 -> gain
+        pct < 0 -> loss
         else -> neutral
     }
     val dash = stringResource(R.string.value_unavailable)
