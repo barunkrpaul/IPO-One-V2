@@ -34,10 +34,8 @@ val JetBrainsMonoFamily = FontFamily(
 
 val EmeraldBull = Color(0xFF00E676)
 val EmeraldContainer = Color(0xFF073B2A)
-val GoldAccent = Color(0xFFFFD54F)
 val GoldContainer = Color(0xFF3B2E08)
 val NavyBackground = Color(0xFF070E1E)
-val NavySurface = Color(0xFF0F1A30)
 val NavySurfaceVariant = Color(0xFF172645)
 val CoralBear = Color(0xFFFF5252)
 

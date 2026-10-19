@@ -1,4 +1,5 @@
 import java.time.Duration
+import java.util.Base64
 
 plugins {
     alias(libs.plugins.android.application)
@@ -6,12 +7,18 @@ plugins {
     alias(libs.plugins.google.services)
 }
 
+val gsJson = file("google-services.json")
+val gsB64 = file("google-services.json.b64")
+if (!gsJson.exists() && gsB64.exists()) {
+    gsJson.writeBytes(Base64.getMimeDecoder().decode(gsB64.readText().trim()))
+}
+
 android {
     namespace = "com.example"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.aistudio.ipoone.invest"
+        applicationId = "com.aistudio.naradaipo.trkqz"
         minSdk = 26
         targetSdk = 36
         versionCode = 1

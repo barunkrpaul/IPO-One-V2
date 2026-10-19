@@ -1,12 +1,13 @@
 package com.example.data.repository
 
 import com.example.base.FirestoreEmulatorTestBase
-import com.google.common.truth.Truth.assertThat
 import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
-import org.junit.Assert.assertThrows
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CloudSyncRepositoryRuleTest : FirestoreEmulatorTestBase() {
@@ -26,16 +27,16 @@ class CloudSyncRepositoryRuleTest : FirestoreEmulatorTestBase() {
                 syncedApplicationCount = 2
             )
         }
-        assertThat(saveResult.isSuccess).isTrue()
+        assertTrue(saveResult.isSuccess)
 
         val profileResult = withTimeout(DEFAULT_TIMEOUT_MS) {
             repository.getUserProfile(uid)
         }
-        assertThat(profileResult.isSuccess).isTrue()
+        assertTrue(profileResult.isSuccess)
         val profile = profileResult.getOrNull()
-        assertThat(profile).isNotNull()
-        assertThat(profile?.displayName).isEqualTo("Barun Kr Paul")
-        assertThat(profile?.mobileNumber).isEqualTo("+91 98765 43210")
+        assertNotNull(profile)
+        assertEquals("Barun Kr Paul", profile?.displayName)
+        assertEquals("+91 98765 43210", profile?.mobileNumber)
     }
 
     @Test
@@ -55,7 +56,7 @@ class CloudSyncRepositoryRuleTest : FirestoreEmulatorTestBase() {
         val emittedItems = withTimeout(FLOW_TIMEOUT_MS) {
             repository.observeWatchlist(uid).first { list -> list.any { it.id == itemId } }
         }
-        assertThat(emittedItems.map { it.id }).contains(itemId)
+        assertTrue(emittedItems.any { it.id == itemId })
     }
 
     @Test
@@ -75,9 +76,9 @@ class CloudSyncRepositoryRuleTest : FirestoreEmulatorTestBase() {
         val crossResult = withTimeout(DEFAULT_TIMEOUT_MS) {
             bobRepo.getUserProfile(aliceUid)
         }
-        assertThat(crossResult.isFailure).isTrue()
+        assertTrue(crossResult.isFailure)
         val ex = crossResult.exceptionOrNull() as? FirebaseFirestoreException
-        assertThat(ex?.code).isEqualTo(FirebaseFirestoreException.Code.PERMISSION_DENIED)
+        assertEquals(FirebaseFirestoreException.Code.PERMISSION_DENIED, ex?.code)
     }
 
     @Test
@@ -97,8 +98,8 @@ class CloudSyncRepositoryRuleTest : FirestoreEmulatorTestBase() {
         val firestoreEx = generateSequence(thrownException) { it.cause }
             .filterIsInstance<FirebaseFirestoreException>()
             .firstOrNull()
-        assertThat(firestoreEx).isNotNull()
-        assertThat(firestoreEx?.code).isEqualTo(FirebaseFirestoreException.Code.PERMISSION_DENIED)
+        assertNotNull(firestoreEx)
+        assertEquals(FirebaseFirestoreException.Code.PERMISSION_DENIED, firestoreEx?.code)
     }
 
     private companion object {

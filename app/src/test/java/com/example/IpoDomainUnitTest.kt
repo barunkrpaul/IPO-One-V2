@@ -1,8 +1,9 @@
 package com.example
 
-import com.example.data.local.entity.FamilyMemberEntity
-import com.example.model.IpoCategory
-import com.example.model.IpoSeries
+import com.example.data.model.IpoApplication
+import com.example.data.model.IpoBoardFilter
+import com.example.data.model.IpoStatusFilter
+import com.example.data.model.PanProfile
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -10,38 +11,53 @@ import org.junit.Test
 class IpoDomainUnitTest {
 
     @Test
-    fun testPanMasking() {
-        val member = FamilyMemberEntity(
-            fullName = "Rahul Sharma",
-            relationship = "Self",
-            pan = "ABCPS1234F",
-            isPrimary = true
+    fun testPanProfileCreation() {
+        val profile = PanProfile(
+            id = "pan_1",
+            userId = "user_123",
+            holderName = "Rahul Sharma",
+            panNumber = "ABCPS1234F",
+            dematId = "1208160012345678",
+            upiId = "rahul@okhdfcbank",
+            category = "Retail"
         )
-        assertEquals("ABC****4F", member.maskedPan)
+        assertEquals("Rahul Sharma", profile.holderName)
+        assertEquals("ABCPS1234F", profile.panNumber)
+        assertEquals("Retail", profile.category)
     }
 
     @Test
-    fun testRetailCategoryLimit() {
-        val lotSize = 7
-        val price = 1960.0
-        val lots = 1
-        val total = lots * lotSize * price // 13,720.0
-        assertTrue(total <= IpoCategory.RETAIL.maxLimitInr)
+    fun testIpoApplicationCalculation() {
+        val lots = 2L
+        val lotSize = 50L
+        val bidPrice = 300L
+        val shares = lots * lotSize
+        val totalAmount = shares * bidPrice
+
+        val application = IpoApplication(
+            id = "app_1",
+            userId = "user_123",
+            ipoId = "ipo_101",
+            ipoName = "Acme Technologies",
+            panHolderName = "Rahul Sharma",
+            panNumber = "ABCPS1234F",
+            lotsApplied = lots,
+            sharesApplied = shares,
+            bidPrice = bidPrice,
+            totalAmount = totalAmount,
+            status = "Applied"
+        )
+        assertEquals(100L, application.sharesApplied)
+        assertEquals(30000L, application.totalAmount)
+        assertEquals("Applied", application.status)
     }
 
     @Test
-    fun testShniCategoryLimit() {
-        val lotSize = 33
-        val price = 450.0
-        val lots = 14
-        val total = lots * lotSize * price // 2,07,900.0
-        assertTrue(total > IpoCategory.RETAIL.maxLimitInr)
-        assertTrue(total <= IpoCategory.SHNI.maxLimitInr)
-    }
-
-    @Test
-    fun testIpoSeriesDisplayNames() {
-        assertEquals("Mainboard", IpoSeries.MAINBOARD.displayName)
-        assertEquals("SME", IpoSeries.SME.displayName)
+    fun testFilterLabels() {
+        assertEquals("All Boards", IpoBoardFilter.ALL.label)
+        assertEquals("Mainboard", IpoBoardFilter.MAINBOARD.label)
+        assertEquals("SME", IpoBoardFilter.SME.label)
+        assertEquals("Open Now", IpoStatusFilter.OPEN.label)
+        assertEquals("All Live", IpoStatusFilter.ALL.label)
     }
 }
