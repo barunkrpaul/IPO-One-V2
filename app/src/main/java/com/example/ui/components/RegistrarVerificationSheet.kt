@@ -78,28 +78,81 @@ enum class AllotmentRegistrar(
     val fullName: String,
     val subtitle: String,
     val portalUrl: String,
-    val accentColor: Color
+    val accentColor: Color,
+    // Lower-case fragments that identify this registrar in a registrar name
+    val nameKeys: List<String> = emptyList()
 ) {
     LINK_INTIME(
         shortName = "Link Intime",
         fullName = "Link Intime (MUFG Intime)",
         subtitle = "Mainboard & SME Registrar • Auto-PAN Fill",
         portalUrl = "https://in.mpms.mufg.com/Initial_Offer/public-issues.html",
-        accentColor = Color(0xFF10B981)
+        accentColor = Color(0xFF10B981),
+        nameKeys = listOf("intime", "mufg")
     ),
     KFINTECH(
         shortName = "KFintech",
         fullName = "KFintech KOSMIC IPO Status",
         subtitle = "Mainboard & SME Registrar • Auto-PAN Fill",
         portalUrl = "https://kosmic.kfintech.com/ipostatus/",
-        accentColor = Color(0xFFF59E0B)
+        accentColor = Color(0xFFF59E0B),
+        nameKeys = listOf("kfin", "karvy")
     ),
     BIGSHARE(
         shortName = "Bigshare",
         fullName = "Bigshare Services Allotment",
         subtitle = "Mainboard & SME Registrar • Auto-PAN Fill",
         portalUrl = "https://ipo.bigshareonline.com/IPO_Status.html",
-        accentColor = Color(0xFF38BDF8)
+        accentColor = Color(0xFF38BDF8),
+        nameKeys = listOf("bigshare")
+    ),
+    CAMEO(
+        shortName = "Cameo",
+        fullName = "Cameo Corporate Services",
+        subtitle = "Mainboard & SME Registrar • Auto-PAN Fill",
+        portalUrl = "https://ipo.cameoindia.com/",
+        accentColor = Color(0xFFF472B6),
+        nameKeys = listOf("cameo")
+    ),
+    SKYLINE(
+        shortName = "Skyline",
+        fullName = "Skyline Financial Services",
+        subtitle = "SME Registrar • Auto-PAN Fill",
+        portalUrl = "https://www.skylinerta.com/ipo.php",
+        accentColor = Color(0xFF2DD4BF),
+        nameKeys = listOf("skyline")
+    ),
+    MAASHITLA(
+        shortName = "Maashitla",
+        fullName = "Maashitla Securities",
+        subtitle = "SME Registrar • Auto-PAN Fill",
+        portalUrl = "https://maashitla.com/allotment-status/public-issues",
+        accentColor = Color(0xFFFB923C),
+        nameKeys = listOf("maashitla")
+    ),
+    PURVA(
+        shortName = "Purva",
+        fullName = "Purva Sharegistry",
+        subtitle = "SME Registrar • Auto-PAN Fill",
+        portalUrl = "https://www.purvashare.com/investor-service/ipo-query",
+        accentColor = Color(0xFFA3E635),
+        nameKeys = listOf("purva")
+    ),
+    INTEGRATED(
+        shortName = "Integrated",
+        fullName = "Integrated Registry Management Services",
+        subtitle = "Mainboard & SME Registrar • Auto-PAN Fill",
+        portalUrl = "https://ipostatus.integratedregistry.in/",
+        accentColor = Color(0xFF818CF8),
+        nameKeys = listOf("integrated registry", "integrated enterprises")
+    ),
+    MAS_SERVICES(
+        shortName = "MAS",
+        fullName = "MAS Services",
+        subtitle = "SME Registrar • Auto-PAN Fill",
+        portalUrl = "https://www.masserv.com/opt.asp",
+        accentColor = Color(0xFFFACC15),
+        nameKeys = listOf("mas services", "masserv")
     ),
     BSE_DIRECT(
         shortName = "BSE India",
@@ -107,11 +160,43 @@ enum class AllotmentRegistrar(
         subtitle = "Exchange-wide IPO Application Verification",
         portalUrl = "https://www.bseindia.com/investors/appli_check.aspx",
         accentColor = Color(0xFFA855F7)
-    )
+    ),
+
+    // Any other registrar: opens the registrar URL stored on the IPO
+    GENERIC(
+        shortName = "Registrar site",
+        fullName = "Registrar website",
+        subtitle = "Opens the registrar link stored on the IPO",
+        portalUrl = "",
+        accentColor = Color(0xFF94A3B8)
+    );
+
+    companion object {
+        /** The registrar named in IPO data ("Kfin Technologies Ltd.", "MUFG Intime India ..."), if known. */
+        fun fromName(name: String?): AllotmentRegistrar? {
+            val n = name?.lowercase() ?: return null
+            return entries.firstOrNull { reg -> reg.nameKeys.any { it in n } }
+        }
+
+        /** Registrars that have their own portal, for the switcher chips. */
+        val withPortal: List<AllotmentRegistrar> get() = entries.filter { it.portalUrl.isNotBlank() }
+    }
 }
+
+/**
+ * The registrar to use for an IPO: the one named in its data when the app knows
+ * it, the generic "registrar site" when only a URL is known, and otherwise the
+ * older name-based guess.
+ */
+fun resolveRegistrar(ipoName: String, ipoId: String, extras: com.example.data.model.IpoExtras?): AllotmentRegistrar =
+    AllotmentRegistrar.fromName(extras?.registrar)
+        ?: if (!extras?.registrarWebsite.isNullOrBlank()) AllotmentRegistrar.GENERIC
+        else detectRegistrarForIpo(ipoName, ipoId)
 
 data class RegistrarDirectCheckRequest(
     val registrar: AllotmentRegistrar,
+    // Registrar URL from the IPO's own data; used for GENERIC and preferred when present
+    val portalUrlOverride: String? = null,
     val panNumber: String,
     val holderName: String = "Investor",
     val dematId: String = "",
@@ -132,46 +217,6 @@ fun copyPanToClipboard(context: Context, panNumber: String, registrarName: Strin
     }
 }
 
-private fun buildAutoFillPanJs(pan: String): String {
-    val safePan = pan.trim().uppercase().replace("'", "").replace("\"", "")
-    return """
-        (function() {
-            try {
-                var panVal = '$safePan';
-                if (!panVal) return 'EMPTY';
-                
-                // Select PAN radio option if present on Link Intime / KFintech / Bigshare
-                var radios = document.querySelectorAll('input[type="radio"]');
-                for (var i = 0; i < radios.length; i++) {
-                    var r = radios[i];
-                    var idOrVal = ((r.id || '') + ' ' + (r.value || '') + ' ' + (r.name || '')).toLowerCase();
-                    if (idOrVal.indexOf('pan') !== -1 || idOrVal.indexOf('342') !== -1) {
-                        r.click();
-                        r.checked = true;
-                    }
-                }
-                
-                // Find text inputs likely corresponding to PAN
-                var inputs = document.querySelectorAll('input[type="text"], input:not([type])');
-                var filled = 0;
-                for (var j = 0; j < inputs.length; j++) {
-                    var inp = inputs[j];
-                    var meta = ((inp.id || '') + ' ' + (inp.name || '') + ' ' + (inp.placeholder || '') + ' ' + (inp.className || '')).toLowerCase();
-                    if (meta.indexOf('captcha') === -1 && meta.indexOf('search') === -1) {
-                        inp.focus();
-                        inp.value = panVal;
-                        inp.dispatchEvent(new Event('input', { bubbles: true }));
-                        inp.dispatchEvent(new Event('change', { bubbles: true }));
-                        filled++;
-                    }
-                }
-                return 'FILLED_' + filled;
-            } catch (e) {
-                return 'ERR';
-            }
-        })();
-    """.trimIndent()
-}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @SuppressLint("SetJavaScriptEnabled")
@@ -187,6 +232,13 @@ fun RegistrarVerificationModalSheet(
     var pageProgress by remember { mutableIntStateOf(15) }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
     var autoFillStatus by remember { mutableStateOf("PAN copied & auto-fill armed") }
+    // The IPO's own registrar link wins for its registrar; GENERIC has no other URL
+    fun urlFor(reg: AllotmentRegistrar): String =
+        request.portalUrlOverride?.takeIf { it.isNotBlank() && reg == request.registrar } ?: reg.portalUrl
+    val switcherRegistrars = remember(request) {
+        AllotmentRegistrar.withPortal +
+            listOfNotNull(AllotmentRegistrar.GENERIC.takeIf { request.registrar == it && !request.portalUrlOverride.isNullOrBlank() })
+    }
 
     LaunchedEffect(activeRegistrar, request.panNumber) {
         if (request.panNumber.isNotBlank()) {
@@ -276,7 +328,7 @@ fun RegistrarVerificationModalSheet(
                                 onClick = {
                                     runCatching {
                                         context.startActivity(
-                                            Intent(Intent.ACTION_VIEW, Uri.parse(activeRegistrar.portalUrl))
+                                            Intent(Intent.ACTION_VIEW, Uri.parse(urlFor(activeRegistrar)))
                                         )
                                     }
                                 },
@@ -312,13 +364,13 @@ fun RegistrarVerificationModalSheet(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        AllotmentRegistrar.entries.forEach { reg ->
+                        switcherRegistrars.forEach { reg ->
                             val selected = activeRegistrar == reg
                             FilterChip(
                                 selected = selected,
                                 onClick = {
                                     activeRegistrar = reg
-                                    webViewRef?.loadUrl(reg.portalUrl)
+                                    webViewRef?.loadUrl(urlFor(reg))
                                 },
                                 label = {
                                     Text(
@@ -401,7 +453,7 @@ fun RegistrarVerificationModalSheet(
                                     Button(
                                         onClick = {
                                             webViewRef?.evaluateJavascript(
-                                                buildAutoFillPanJs(request.panNumber)
+                                                buildRegistrarFillJs(request.panNumber, request.ipoName, autoSubmit = false)
                                             ) {
                                                 autoFillStatus =
                                                     "PAN ${request.panNumber.uppercase()} injected into ${activeRegistrar.shortName} form!"
@@ -494,7 +546,7 @@ fun RegistrarVerificationModalSheet(
                                     pageProgress = 100
                                     if (request.panNumber.isNotBlank()) {
                                         view?.evaluateJavascript(
-                                            buildAutoFillPanJs(request.panNumber)
+                                            buildRegistrarFillJs(request.panNumber, request.ipoName, autoSubmit = false)
                                         ) {
                                             autoFillStatus =
                                                 "PAN ${request.panNumber.uppercase()} auto-filled & ready on ${activeRegistrar.shortName}"
@@ -503,7 +555,7 @@ fun RegistrarVerificationModalSheet(
                                 }
                             }
 
-                            loadUrl(activeRegistrar.portalUrl)
+                            loadUrl(urlFor(activeRegistrar))
                             webViewRef = this
                         }
                     },

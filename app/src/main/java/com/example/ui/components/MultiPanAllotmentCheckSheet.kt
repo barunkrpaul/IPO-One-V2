@@ -34,6 +34,12 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FactCheck
+import androidx.compose.ui.res.stringResource
+import com.example.R
+import com.example.data.model.AllotmentOutcome
+import com.example.data.model.AllotmentResult
+import com.example.data.model.AllotmentTarget
+import com.example.data.model.allotmentTargets
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Share
@@ -95,7 +101,8 @@ import kotlin.math.abs
 enum class PanAllotmentStatus(val label: String) {
     CHECKING("Checking..."),
     ALLOTTED("Allotted"),
-    NOT_ALLOTTED("Not Allotted")
+    NOT_ALLOTTED("Not Allotted"),
+    UNVERIFIED("Could not verify")
 }
 
 enum class PanResultFilter(val label: String) {
@@ -111,7 +118,9 @@ data class AppliedIpoSummary(
     val issuePrice: Int = 100,
     val lotSize: Int = 15,
     val boaDate: String = "Live",
-    val registrar: AllotmentRegistrar = detectRegistrarForIpo(ipoName, ipoId)
+    val registrar: AllotmentRegistrar = detectRegistrarForIpo(ipoName, ipoId),
+    // Registrar status page from the IPO's own data, when known
+    val registrarUrl: String? = null
 )
 
 fun detectRegistrarForIpo(ipoName: String, ipoId: String = ""): AllotmentRegistrar {
@@ -233,21 +242,8 @@ suspend fun autoVerifySinglePanAllotment(
         }
     }.getOrNull()
 
-    if (liveResult != null) {
-        return@withContext liveResult
-    }
-
-    // Brief realistic verification cadence per PAN card
-    delay(320L)
-
-    // Deterministic per-(IPO, PAN) resolution so all saved PAN cards show clear Allotted / Not Allotted status
-    val seed = abs("${ipoName.trim().uppercase()}_${panProfile.panNumber.trim().uppercase()}".hashCode())
-    val isAllotted = if (panIndex == 0 && seed % 2 == 0) {
-        true
-    } else {
-        (seed % 3 == 0)
-    }
-    if (isAllotted) PanAllotmentStatus.ALLOTTED else PanAllotmentStatus.NOT_ALLOTTED
+    // Without a definite answer from the registrar the result is unknown; never guess
+    liveResult ?: PanAllotmentStatus.UNVERIFIED
 }
 
 /**
@@ -267,10 +263,12 @@ fun MultiPanAllotmentCheckModalSheet(
     onOpenOfficialRegistrar: (RegistrarDirectCheckRequest) -> Unit,
     onDismiss: () -> Unit,
     hidePanNumbers: Boolean = false,
-    onToggleHidePanNumbers: (() -> Unit)? = null
+    onToggleHidePanNumbers: (() -> Unit)? = null,
+    onSaveAllotmentOutcome: ((AllotmentTarget, AllotmentOutcome) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var showRunner by remember { mutableStateOf(false) }
     val panStatusMap = remember { mutableStateMapOf<String, PanAllotmentStatus>() }
     var isAutoChecking by remember { mutableStateOf(false) }
     var checkedCount by remember { mutableIntStateOf(0) }
@@ -315,7 +313,9 @@ fun MultiPanAllotmentCheckModalSheet(
             )
             panStatusMap[key] = resultStatus
             checkedCount = index + 1
-            resolvedBatch[pan] = resultStatus.label
+            if (resultStatus == PanAllotmentStatus.ALLOTTED || resultStatus == PanAllotmentStatus.NOT_ALLOTTED) {
+                resolvedBatch[pan] = resultStatus.label
+            }
         }
         isAutoChecking = false
         if (resolvedBatch.isNotEmpty()) {
@@ -556,6 +556,31 @@ fun MultiPanAllotmentCheckModalSheet(
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
+
+                    // Guided check on the registrar's own site: fills each PAN in turn and reads the result
+                    if (onSaveAllotmentOutcome != null) {
+                        Button(
+                            onClick = { showRunner = true },
+                            enabled = !isAutoChecking,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = appliedIpo.registrar.accentColor,
+                                contentColor = Color(0xFF04131A)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(44.dp)
+                                .testTag("start_registrar_runner_button")
+                        ) {
+                            Icon(Icons.Default.FactCheck, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = stringResource(R.string.runner_start),
+                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
 
                     // Action Row: Re-Check All PANs + Share + Add New PAN Card
                     Row(
@@ -901,6 +926,7 @@ fun MultiPanAllotmentCheckModalSheet(
                                 onOpenOfficialRegistrar(
                                     RegistrarDirectCheckRequest(
                                         registrar = appliedIpo.registrar,
+                                        portalUrlOverride = appliedIpo.registrarUrl,
                                         panNumber = pan.panNumber.uppercase(),
                                         holderName = pan.holderName,
                                         dematId = pan.dematId,
@@ -913,6 +939,29 @@ fun MultiPanAllotmentCheckModalSheet(
                 }
             }
         }
+    }
+
+    if (showRunner && onSaveAllotmentOutcome != null) {
+        val targets = remember(appliedIpo, panProfiles, existingApplications) {
+            allotmentTargets(appliedIpo.ipoId, appliedIpo.ipoName, panProfiles, existingApplications)
+        }
+        AllotmentCheckRunnerSheet(
+            ipoName = appliedIpo.ipoName,
+            registrar = appliedIpo.registrar,
+            portalUrl = appliedIpo.registrarUrl?.takeIf { it.isNotBlank() } ?: appliedIpo.registrar.portalUrl,
+            targets = targets,
+            hidePanNumbers = localHidePan,
+            onResult = { target, outcome ->
+                // Mirror the result in this sheet's per-PAN cards
+                panStatusMap[target.panNumber] = when (outcome.result) {
+                    AllotmentResult.ALLOTTED -> PanAllotmentStatus.ALLOTTED
+                    AllotmentResult.NOT_ALLOTTED -> PanAllotmentStatus.NOT_ALLOTTED
+                    AllotmentResult.UNVERIFIED -> PanAllotmentStatus.UNVERIFIED
+                }
+                onSaveAllotmentOutcome(target, outcome)
+            },
+            onDismiss = { showRunner = false }
+        )
     }
 }
 
@@ -967,11 +1016,13 @@ fun NaradaStylePanResultCard(
         PanAllotmentStatus.ALLOTTED -> Color(0xFF10B981).copy(alpha = 0.55f)
         PanAllotmentStatus.NOT_ALLOTTED -> Color(0xFFF87171).copy(alpha = 0.45f)
         PanAllotmentStatus.CHECKING -> Color(0xFF38BDF8).copy(alpha = 0.4f)
+        PanAllotmentStatus.UNVERIFIED -> Color(0xFF94A3B8).copy(alpha = 0.4f)
     }
     val cardBg = when (status) {
         PanAllotmentStatus.ALLOTTED -> Color(0xFF062E24)
         PanAllotmentStatus.NOT_ALLOTTED -> Color(0xFF1F1218)
         PanAllotmentStatus.CHECKING -> Color(0xFF0F1E36)
+        PanAllotmentStatus.UNVERIFIED -> Color(0xFF151C28)
     }
 
     Card(
@@ -1006,6 +1057,7 @@ fun NaradaStylePanResultCard(
                                     PanAllotmentStatus.ALLOTTED -> Color(0xFF10B981).copy(alpha = 0.2f)
                                     PanAllotmentStatus.NOT_ALLOTTED -> Color(0xFFF87171).copy(alpha = 0.2f)
                                     PanAllotmentStatus.CHECKING -> Color(0xFF38BDF8).copy(alpha = 0.2f)
+                                    PanAllotmentStatus.UNVERIFIED -> Color(0xFF94A3B8).copy(alpha = 0.2f)
                                 }
                             ),
                         contentAlignment = Alignment.Center
@@ -1017,6 +1069,7 @@ fun NaradaStylePanResultCard(
                                 PanAllotmentStatus.ALLOTTED -> Color(0xFF34D399)
                                 PanAllotmentStatus.NOT_ALLOTTED -> Color(0xFFF87171)
                                 PanAllotmentStatus.CHECKING -> Color(0xFF38BDF8)
+                                PanAllotmentStatus.UNVERIFIED -> Color(0xFF94A3B8)
                             }
                         )
                     }
@@ -1117,6 +1170,23 @@ fun NaradaStylePanResultCard(
                         }
                     }
 
+                    PanAllotmentStatus.UNVERIFIED -> {
+                        Surface(
+                            color = Color(0xFF334155),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .clickable { onToggleStatus() }
+                                .testTag("pan_status_badge_${panProfile.panNumber}")
+                        ) {
+                            Text(
+                                text = "COULD NOT VERIFY",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.ExtraBold),
+                                color = Color(0xFFE2E8F0),
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                            )
+                        }
+                    }
+
                     PanAllotmentStatus.NOT_ALLOTTED -> {
                         Surface(
                             color = Color(0xFF991B1B),
@@ -1165,12 +1235,15 @@ fun NaradaStylePanResultCard(
                             "Allotted: 0 Shares (Applied: $lotShares Sh • Mandate Unblocked)"
                         PanAllotmentStatus.CHECKING ->
                             "Querying ${registrar.shortName} allotment server..."
+                        PanAllotmentStatus.UNVERIFIED ->
+                            "No answer from ${registrar.shortName} yet. Check on the registrar site."
                     },
                     style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
                     color = when (status) {
                         PanAllotmentStatus.ALLOTTED -> Color(0xFF6EE7B7)
                         PanAllotmentStatus.NOT_ALLOTTED -> Color(0xFFFCA5A5)
                         PanAllotmentStatus.CHECKING -> Color(0xFF94A3B8)
+                        PanAllotmentStatus.UNVERIFIED -> Color(0xFFCBD5E1)
                     },
                     modifier = Modifier.weight(1f)
                 )
@@ -1402,7 +1475,7 @@ fun QuickAddPanModalSheet(
                             OutlinedTextField(
                                 value = upiId,
                                 onValueChange = { upiId = it.take(60) },
-                                label = { Text("ASBA UPI Handle (Optional)") },
+                                label = { Text(stringResource(R.string.upi_optional_label)) },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth()
                             )
@@ -1454,7 +1527,7 @@ fun QuickAddPanModalSheet(
                                             holderName.trim(),
                                             panNumber.trim().uppercase(),
                                             dematId.trim().ifBlank { "1208160000000001" },
-                                            upiId.trim().ifBlank { "investor@upi" },
+                                            upiId.trim(),
                                             category
                                         )
                                     } else {
@@ -1462,7 +1535,7 @@ fun QuickAddPanModalSheet(
                                             holderName.trim(),
                                             panNumber.trim().uppercase(),
                                             dematId.trim().ifBlank { "1208160000000001" },
-                                            upiId.trim().ifBlank { "investor@upi" },
+                                            upiId.trim(),
                                             category
                                         )
                                     }

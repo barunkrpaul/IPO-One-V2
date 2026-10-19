@@ -114,6 +114,10 @@ data class IpoApplication(
     val totalAmount: Long = 14000L,
     val upiId: String = "",
     val status: String = "Applied",
+    // Set by the registrar allotment check: ALLOTTED / NOT_ALLOTTED / UNVERIFIED
+    val allotmentResult: String? = null,
+    val sharesAllotted: Long? = null,
+    val checkedAt: Timestamp? = null,
     @ServerTimestamp val createdAt: Timestamp? = null,
     @ServerTimestamp val updatedAt: Timestamp? = null
 )

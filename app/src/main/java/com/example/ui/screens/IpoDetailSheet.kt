@@ -364,7 +364,9 @@ fun IpoApplyAndAllotmentSection(
     onAddPanProfile: ((holderName: String, panNumber: String, dematId: String, upiId: String, category: String) -> Unit)? = null,
     hidePanNumbers: Boolean = false,
     onToggleHidePanNumbers: (() -> Unit)? = null,
-    registrar: AllotmentRegistrar = detectRegistrarForIpo(ipo.name, ipo.id)
+    registrar: AllotmentRegistrar = detectRegistrarForIpo(ipo.name, ipo.id),
+    registrarUrl: String? = null,
+    onSaveAllotmentOutcome: ((com.example.data.model.AllotmentTarget, com.example.data.model.AllotmentOutcome) -> Unit)? = null
 ) {
     var selectedLots by remember { mutableIntStateOf(1) }
     var selectedCategory by remember { mutableStateOf("Retail") }
@@ -658,11 +660,12 @@ fun IpoApplyAndAllotmentSection(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    listOf(
+                    // This IPO's registrar first, then the three largest
+                    (listOf(registrar) + listOf(
                         AllotmentRegistrar.LINK_INTIME,
                         AllotmentRegistrar.KFINTECH,
                         AllotmentRegistrar.BIGSHARE
-                    ).forEach { reg ->
+                    )).distinct().take(3).forEach { reg ->
                         Surface(
                             color = reg.accentColor.copy(alpha = 0.14f),
                             shape = RoundedCornerShape(10.dp),
@@ -676,6 +679,7 @@ fun IpoApplyAndAllotmentSection(
                                 .clickable {
                                     activeRegistrarRequest = RegistrarDirectCheckRequest(
                                         registrar = reg,
+                                        portalUrlOverride = registrarUrl.takeIf { reg == registrar },
                                         panNumber = customPanNumber.trim().uppercase(),
                                         holderName = customHolderName.ifBlank { "Primary Investor" },
                                         ipoName = ipo.name
@@ -719,7 +723,8 @@ fun IpoApplyAndAllotmentSection(
             issuePrice = if (ipo.issuePrice > 0) ipo.issuePrice else 100,
             lotSize = if (ipo.lotSize > 0) ipo.lotSize else 15,
             boaDate = ipo.boaDate,
-            registrar = registrar
+            registrar = registrar,
+            registrarUrl = registrarUrl
         )
         MultiPanAllotmentCheckModalSheet(
             appliedIpo = summary,
@@ -739,7 +744,8 @@ fun IpoApplyAndAllotmentSection(
             },
             onDismiss = { showMultiPanCheckSheet = false },
             hidePanNumbers = hidePanNumbers,
-            onToggleHidePanNumbers = onToggleHidePanNumbers
+            onToggleHidePanNumbers = onToggleHidePanNumbers,
+            onSaveAllotmentOutcome = onSaveAllotmentOutcome
         )
     }
 

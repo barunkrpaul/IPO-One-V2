@@ -204,7 +204,8 @@ class IpoFirestoreRepository(
                     "holderName" to holderName.trim().take(80),
                     "panNumber" to panNumber.trim().uppercase().padEnd(10, 'X').take(10),
                     "dematId" to dematId.trim().ifBlank { "1208160000000001" }.take(32),
-                    "upiId" to upiId.trim().ifBlank { "investor@upi" }.take(80),
+                    // Default UPI is optional on a vault PAN
+                    "upiId" to upiId.trim().take(80),
                     "category" to validCat,
                     "updatedAt" to FieldValue.serverTimestamp()
                 )
@@ -303,6 +304,33 @@ class IpoFirestoreRepository(
                     "updatedAt" to FieldValue.serverTimestamp()
                 )
             ).await()
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, docRef.path)
+            Result.failure(e)
+        }
+    }
+
+    /** Stores a registrar check result; [newStatus] also updates the status when the result is definite. */
+    suspend fun updateAllotmentResult(
+        appId: String,
+        result: String,
+        sharesAllotted: Long?,
+        newStatus: String?
+    ): Result<Unit> {
+        val uid = requireUserId()
+        val docRef = db.collection("users").document(uid).collection("applications").document(appId)
+        return try {
+            val fields = mutableMapOf<String, Any?>(
+                "allotmentResult" to result,
+                "sharesAllotted" to sharesAllotted,
+                "checkedAt" to FieldValue.serverTimestamp(),
+                "updatedAt" to FieldValue.serverTimestamp()
+            )
+            if (newStatus != null) fields["status"] = newStatus
+            docRef.update(fields).await()
             Result.success(Unit)
         } catch (e: CancellationException) {
             throw e

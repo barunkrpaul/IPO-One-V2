@@ -347,7 +347,18 @@ fun MainAppContent(
                     issuePrice = if (detailIpo.issuePrice > 0) detailIpo.issuePrice else 100,
                     lotSize = if (detailIpo.lotSize > 0) detailIpo.lotSize else 15,
                     boaDate = detailIpo.boaDate,
-                    registrar = registrar
+                    registrar = registrar,
+                    registrarUrl = ipoExtras[detailIpo.id]?.registrarWebsite
+                )
+            },
+            onSaveAllotmentOutcome = { target, outcome ->
+                viewModel.saveAllotmentOutcome(
+                    ipoId = detailIpo.id,
+                    ipoName = detailIpo.name,
+                    lotSize = detailIpo.lotSize,
+                    issuePrice = detailIpo.issuePrice,
+                    target = target,
+                    outcome = outcome
                 )
             },
             onTimelineDateClick = { date ->
@@ -557,7 +568,8 @@ fun MainAppContent(
                             issuePrice = if (ipo.issuePrice > 0) ipo.issuePrice else 100,
                             lotSize = if (ipo.lotSize > 0) ipo.lotSize else 15,
                             boaDate = ipo.boaDate,
-                            registrar = detectRegistrarForIpo(ipo.name, ipo.id)
+                            registrar = com.example.ui.components.resolveRegistrar(ipo.name, ipo.id, ipoExtras[ipo.id]),
+                            registrarUrl = ipoExtras[ipo.id]?.registrarWebsite
                         )
                     },
                     hidePanNumbers = hidePanNumbers,
@@ -646,7 +658,18 @@ fun MainAppContent(
                             )
                         },
                         hidePanNumbers = hidePanNumbers,
-                        onToggleHidePanNumbers = viewModel::toggleHidePanNumbers
+                        onToggleHidePanNumbers = viewModel::toggleHidePanNumbers,
+                        ipoExtras = ipoExtras,
+                        onSaveAllotmentOutcome = { summary, target, outcome ->
+                            viewModel.saveAllotmentOutcome(
+                                ipoId = summary.ipoId,
+                                ipoName = summary.ipoName,
+                                lotSize = summary.lotSize,
+                                issuePrice = summary.issuePrice,
+                                target = target,
+                                outcome = outcome
+                            )
+                        }
                     )
                 }
 
@@ -722,7 +745,17 @@ fun MainAppContent(
             },
             onDismiss = { activeMultiPanIpoCheck = null },
             hidePanNumbers = hidePanNumbers,
-            onToggleHidePanNumbers = viewModel::toggleHidePanNumbers
+            onToggleHidePanNumbers = viewModel::toggleHidePanNumbers,
+            onSaveAllotmentOutcome = { target, outcome ->
+                viewModel.saveAllotmentOutcome(
+                    ipoId = targetIpo.ipoId,
+                    ipoName = targetIpo.ipoName,
+                    lotSize = targetIpo.lotSize,
+                    issuePrice = targetIpo.issuePrice,
+                    target = target,
+                    outcome = outcome
+                )
+            }
         )
     }
 

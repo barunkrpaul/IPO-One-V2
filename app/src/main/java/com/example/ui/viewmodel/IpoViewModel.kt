@@ -4,6 +4,9 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.model.IpoApplication
+import com.example.data.model.AllotmentOutcome
+import com.example.data.model.AllotmentResult
+import com.example.data.model.AllotmentTarget
 import com.example.data.model.CalendarEvent
 import com.example.data.model.IpoBoardFilter
 import com.example.data.model.IpoExtras
@@ -207,11 +210,14 @@ class IpoViewModel(
     private val _guestWatchlist = MutableStateFlow<List<WatchlistItem>>(emptyList())
 
     val panProfilesState: StateFlow<UiState<List<PanProfile>>> = if (currentUserId == "guest") {
-        _guestPanProfiles.map { UiState.Success(it) }
+        _guestPanProfiles.map { UiState.Success(it.sortedBy { p -> p.holderName.lowercase() }) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), UiState.Success(emptyList()))
     } else {
         repository.observePanProfiles(currentUserId)
-            .map<List<PanProfile>, UiState<List<PanProfile>>> { UiState.Success(it) }
+            .map<List<PanProfile>, UiState<List<PanProfile>>> { list ->
+                // The vault is always shown in alphabetical order of holder name
+                UiState.Success(list.sortedBy { it.holderName.lowercase() })
+            }
             .catch { e ->
                 Log.w(TAG, "Error observing PAN profiles", e)
                 emit(UiState.Error(e.message ?: "Failed to load PAN Vault"))
@@ -638,7 +644,7 @@ class IpoViewModel(
                             holderName = holderName.trim(),
                             panNumber = safePan,
                             dematId = dematId.trim().ifBlank { "1208160000000001" },
-                            upiId = upiId.trim().ifBlank { "investor@upi" },
+                            upiId = upiId.trim(),
                             category = category
                         )
                     } else it
@@ -910,6 +916,92 @@ class IpoViewModel(
                             status = resolvedStatus
                         )
                     }
+                }
+            }
+        }
+    }
+
+    /**
+     * Records one registrar check. Updates the PAN's application for this IPO,
+     * or creates one when a definite result arrives for a vault PAN that has no
+     * logged application yet. "Could not verify" never creates a record.
+     */
+    fun saveAllotmentOutcome(
+        ipoId: String,
+        ipoName: String,
+        lotSize: Int,
+        issuePrice: Int,
+        target: AllotmentTarget,
+        outcome: AllotmentOutcome
+    ) {
+        viewModelScope.launch {
+            val existingApps = (applicationsState.value as? UiState.Success)?.data ?: emptyList()
+            val existing = existingApps.firstOrNull { it.id == target.applicationId }
+                ?: existingApps.firstOrNull {
+                    (it.ipoId == ipoId || it.ipoName.equals(ipoName, ignoreCase = true)) &&
+                        it.panNumber.equals(target.panNumber, ignoreCase = true)
+                }
+            val newStatus = when (outcome.result) {
+                AllotmentResult.ALLOTTED -> "Allotted"
+                AllotmentResult.NOT_ALLOTTED -> "Not Allotted"
+                AllotmentResult.UNVERIFIED -> null
+            }
+            if (currentUserId == "guest") {
+                if (existing != null) {
+                    _guestApplications.value = _guestApplications.value.map {
+                        if (it.id == existing.id) it.copy(
+                            allotmentResult = outcome.result.stored,
+                            sharesAllotted = outcome.sharesAllotted,
+                            checkedAt = com.google.firebase.Timestamp.now(),
+                            status = newStatus ?: it.status
+                        ) else it
+                    }
+                } else if (newStatus != null) {
+                    val shares = (if (lotSize > 0) lotSize else 1).toLong()
+                    val price = (if (issuePrice > 0) issuePrice else 1).toLong()
+                    _guestApplications.value = _guestApplications.value + IpoApplication(
+                        id = "app_${ipoId}_${target.panNumber}_${System.currentTimeMillis()}",
+                        userId = "guest",
+                        ipoId = ipoId,
+                        ipoName = ipoName,
+                        panHolderName = target.holderName.ifBlank { "Investor" },
+                        panNumber = target.panNumber,
+                        lotsApplied = 1L,
+                        sharesApplied = shares,
+                        bidPrice = price,
+                        totalAmount = shares * price,
+                        status = newStatus,
+                        allotmentResult = outcome.result.stored,
+                        sharesAllotted = outcome.sharesAllotted,
+                        checkedAt = com.google.firebase.Timestamp.now()
+                    )
+                }
+                return@launch
+            }
+            val appId = existing?.id ?: if (newStatus != null) {
+                val shares = if (lotSize > 0) lotSize else 1
+                val price = if (issuePrice > 0) issuePrice else 1
+                repository.submitIpoApplication(
+                    ipoId = ipoId.ifBlank { "ipo_${ipoName.hashCode()}" },
+                    ipoName = ipoName,
+                    panHolderName = target.holderName.ifBlank { "Investor" },
+                    panNumber = target.panNumber,
+                    category = "Retail",
+                    lotsApplied = 1,
+                    sharesApplied = shares,
+                    bidPrice = price,
+                    totalAmount = shares * price,
+                    // Applications need a UPI; use the vault PAN's default when it has one
+                    upiId = (panProfilesState.value as? UiState.Success)?.data
+                        ?.firstOrNull { it.panNumber.equals(target.panNumber, ignoreCase = true) }
+                        ?.upiId?.takeIf { it.length >= 3 } ?: "not-set@upi",
+                    status = newStatus
+                ).getOrNull()
+            } else null
+            if (appId != null) {
+                val res = repository.updateAllotmentResult(appId, outcome.result.stored, outcome.sharesAllotted, newStatus)
+                if (res.isFailure) {
+                    _statusBanner.value = "Could not save the allotment result for ${target.holderName}"
                 }
             }
         }

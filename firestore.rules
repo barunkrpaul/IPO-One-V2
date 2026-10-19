@@ -46,10 +46,18 @@ service cloud.firestore {
              data.holderName is string && data.holderName.size() >= 2 && data.holderName.size() <= 80 &&
              data.panNumber is string && data.panNumber.size() == 10 &&
              data.dematId is string && data.dematId.size() >= 4 && data.dematId.size() <= 32 &&
-             data.upiId is string && data.upiId.size() >= 3 && data.upiId.size() <= 80 &&
+             data.upiId is string && data.upiId.size() <= 80 &&
              data.category is string && data.category in ['Retail', 'sHNI', 'bHNI'] &&
              isValidTimestamp(data.createdAt) &&
              isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidAllotmentFields(data) {
+      return (!('allotmentResult' in data) || data.allotmentResult == null ||
+                data.allotmentResult in ['ALLOTTED', 'NOT_ALLOTTED', 'UNVERIFIED']) &&
+             (!('sharesAllotted' in data) || data.sharesAllotted == null ||
+                (data.sharesAllotted is int && data.sharesAllotted >= 0 && data.sharesAllotted <= 10000000)) &&
+             (!('checkedAt' in data) || data.checkedAt == null || isValidTimestamp(data.checkedAt));
     }
 
     function isValidIpoApplication(data) {
@@ -65,6 +73,7 @@ service cloud.firestore {
              data.totalAmount is int && data.totalAmount >= 1 && data.totalAmount <= 100000000 &&
              data.upiId is string && data.upiId.size() >= 3 && data.upiId.size() <= 80 &&
              data.status is string && data.status in ['Mandate Pending', 'Applied', 'Allotted', 'Not Allotted'] &&
+             isValidAllotmentFields(data) &&
              isValidTimestamp(data.createdAt) &&
              isValidTimestamp(data.updatedAt);
     }
@@ -133,7 +142,7 @@ service cloud.firestore {
                          isValidId(appId) &&
                          incoming().userId == request.auth.uid &&
                          incoming().keys().hasAll(['userId', 'ipoId', 'ipoName', 'panHolderName', 'panNumber', 'category', 'lotsApplied', 'sharesApplied', 'bidPrice', 'totalAmount', 'upiId', 'status', 'createdAt', 'updatedAt']) &&
-                         incoming().keys().hasOnly(['userId', 'ipoId', 'ipoName', 'panHolderName', 'panNumber', 'category', 'lotsApplied', 'sharesApplied', 'bidPrice', 'totalAmount', 'upiId', 'status', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'ipoId', 'ipoName', 'panHolderName', 'panNumber', 'category', 'lotsApplied', 'sharesApplied', 'bidPrice', 'totalAmount', 'upiId', 'status', 'allotmentResult', 'sharesAllotted', 'checkedAt', 'createdAt', 'updatedAt']) &&
                          isValidIpoApplication(incoming());
 
         allow update: if isOwner(userId) &&
@@ -141,7 +150,7 @@ service cloud.firestore {
                          isValidIpoApplication(incoming()) &&
                          incoming().userId == existing().userId &&
                          incoming().createdAt == existing().createdAt &&
-                         incoming().diff(existing()).affectedKeys().hasOnly(['status', 'lotsApplied', 'sharesApplied', 'totalAmount', 'upiId', 'updatedAt']);
+                         incoming().diff(existing()).affectedKeys().hasOnly(['status', 'lotsApplied', 'sharesApplied', 'totalAmount', 'upiId', 'allotmentResult', 'sharesAllotted', 'checkedAt', 'updatedAt']);
 
         allow delete: if isOwner(userId) && isValidId(appId);
       }

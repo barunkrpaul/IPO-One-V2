@@ -102,15 +102,7 @@ import java.util.Locale
 private val DetailDateFormat = DateTimeFormatter.ofPattern("EEE, d MMM yyyy", Locale.ENGLISH)
 
 /** Maps a registrar name from ipo_extras to the registrars the app can auto-check. */
-fun registrarFromName(name: String?): AllotmentRegistrar? {
-    val n = name?.lowercase() ?: return null
-    return when {
-        n.contains("kfin") || n.contains("karvy") -> AllotmentRegistrar.KFINTECH
-        n.contains("intime") || n.contains("mufg") -> AllotmentRegistrar.LINK_INTIME
-        n.contains("bigshare") -> AllotmentRegistrar.BIGSHARE
-        else -> null
-    }
-}
+fun registrarFromName(name: String?): AllotmentRegistrar? = AllotmentRegistrar.fromName(name)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -131,6 +123,7 @@ fun IpoDetailScreen(
     onAddPanProfile: (holderName: String, panNumber: String, dematId: String, upiId: String, category: String) -> Unit,
     onToggleHidePanNumbers: () -> Unit,
     onCheckAllotmentForAll: (AllotmentRegistrar) -> Unit,
+    onSaveAllotmentOutcome: ((com.example.data.model.AllotmentTarget, com.example.data.model.AllotmentOutcome) -> Unit)? = null,
     onTimelineDateClick: ((LocalDate) -> Unit)? = null,
     onIntermediaryClick: ((IntermediaryRole, String) -> Unit)? = null
 ) {
@@ -139,7 +132,7 @@ fun IpoDetailScreen(
     val today = remember { LocalDate.now() }
     val stage = ipo.lifecycleStage(today)
     val isSme = ipo.category.equals("SME", ignoreCase = true)
-    val registrar = registrarFromName(extras?.registrar) ?: detectRegistrarForIpo(ipo.name, ipo.id)
+    val registrar = com.example.ui.components.resolveRegistrar(ipo.name, ipo.id, extras)
     val myApplications = remember(ipo, applications) {
         com.example.data.model.applicationsForIpo(ipo, applications)
     }
@@ -234,7 +227,9 @@ fun IpoDetailScreen(
                 onAddPanProfile = onAddPanProfile,
                 hidePanNumbers = hidePanNumbers,
                 onToggleHidePanNumbers = onToggleHidePanNumbers,
-                registrar = registrar
+                registrar = registrar,
+                registrarUrl = extras?.registrarWebsite,
+                onSaveAllotmentOutcome = onSaveAllotmentOutcome
             )
             com.example.ui.components.CopyrightAttributionCard(
                 modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)

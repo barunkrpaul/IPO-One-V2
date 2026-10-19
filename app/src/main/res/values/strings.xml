@@ -173,4 +173,28 @@
     <string name="intermediaries_role_registrar">Registrar</string>
     <string name="intermediaries_role_market_maker">Market maker</string>
     <string name="intermediaries_not_found">%1$s is not in the directory yet. Fetch IPO details to include it.</string>
+
+    <!-- Allotment check runner -->
+    <string name="runner_title">Allotment check · %1$s</string>
+    <string name="runner_subtitle">%1$s · %2$d of %3$d done</string>
+    <string name="runner_close">Close</string>
+    <string name="runner_current">%1$d of %2$d · %3$s (%4$s)</string>
+    <string name="runner_loading">Opening %1$s…</string>
+    <string name="runner_loading_short">Opening registrar…</string>
+    <string name="runner_busy_retrying">Registrar busy, retrying… (attempt %1$d of %2$d)</string>
+    <string name="runner_filling">Filling company and PAN…</string>
+    <string name="runner_reading">Submitted. Reading the result…</string>
+    <string name="runner_waiting_for_user">Complete the CAPTCHA (if shown) and submit. The result is read automatically.</string>
+    <string name="runner_retry">Retry</string>
+    <string name="runner_skip">Skip</string>
+    <string name="runner_mark_allotted">Allotted</string>
+    <string name="runner_mark_not_allotted">Not allotted</string>
+    <string name="runner_summary">%1$d allotted · %2$d not allotted · %3$d could not verify</string>
+    <string name="runner_no_targets">No saved PANs or logged applications for this IPO.</string>
+    <string name="runner_done">Done</string>
+    <string name="runner_start">Check all on registrar site</string>
+    <string name="allotment_search_hint">Search IPO, PAN holder or result</string>
+    <string name="allotment_search_clear">Clear search</string>
+    <string name="upi_optional_label">Default UPI ID (optional)</string>
+    <string name="upi_not_set">No default UPI</string>
 </resources>

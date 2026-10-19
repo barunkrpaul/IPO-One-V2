@@ -51,6 +51,17 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.res.stringResource
+import com.example.R
+import com.example.data.model.AllotmentOutcome
+import com.example.data.model.AllotmentTarget
+import com.example.data.model.IpoExtras
+import com.example.data.model.maskUpiId
+import com.example.data.model.matchesAllotmentSearch
+import com.example.ui.components.resolveRegistrar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -105,9 +116,12 @@ fun AllotmentAndVaultScreen(
     onApplyIpoForAllPans: ((LiveIpoItem, List<PanProfile>) -> Unit)? = null,
     onSaveBatchAllotmentResults: ((AppliedIpoSummary, Map<PanProfile, String>) -> Unit)? = null,
     hidePanNumbers: Boolean = false,
-    onToggleHidePanNumbers: (() -> Unit)? = null
+    onToggleHidePanNumbers: (() -> Unit)? = null,
+    ipoExtras: Map<String, IpoExtras> = emptyMap(),
+    onSaveAllotmentOutcome: ((AppliedIpoSummary, AllotmentTarget, AllotmentOutcome) -> Unit)? = null
 ) {
     val context = LocalContext.current
+    var allotmentSearch by rememberSaveable { mutableStateOf("") }
     var showAddPanForm by remember { mutableStateOf(false) }
     var editingPanId by remember { mutableStateOf<String?>(null) }
     var showOptionalDematFields by remember { mutableStateOf(false) }
@@ -154,21 +168,26 @@ fun AllotmentAndVaultScreen(
                 issuePrice = issuePrice,
                 lotSize = lotSize,
                 boaDate = liveMatch?.boaDate ?: "Allotment Live",
-                registrar = detectRegistrarForIpo(first.ipoName, first.ipoId)
+                registrar = resolveRegistrar(first.ipoName, first.ipoId, ipoExtras[first.ipoId]),
+                registrarUrl = ipoExtras[first.ipoId]?.registrarWebsite
             )
         }
     }
 
-    val filteredAppliedIpos = remember(groupedAppliedIpos, appList, appliedIpoFilter) {
+    val filteredAppliedIpos = remember(groupedAppliedIpos, appList, appliedIpoFilter, allotmentSearch) {
         groupedAppliedIpos.filter { summary ->
             val apps = appList.filter {
                 it.ipoId == summary.ipoId || it.ipoName.equals(summary.ipoName, ignoreCase = true)
             }
-            when (appliedIpoFilter) {
+            val matchesFilter = when (appliedIpoFilter) {
                 "ALLOTTED" -> apps.any { it.status == "Allotted" }
                 "PENDING" -> apps.any { it.status == "Mandate Pending" || it.status == "Applied" }
                 else -> true
             }
+            // Search covers the IPO name, any PAN holder on it, and the allotment result
+            matchesFilter && (allotmentSearch.isBlank() ||
+                summary.ipoName.contains(allotmentSearch.trim(), ignoreCase = true) ||
+                apps.any { matchesAllotmentSearch(it, allotmentSearch) })
         }
     }
 
@@ -380,7 +399,7 @@ fun AllotmentAndVaultScreen(
                                     OutlinedTextField(
                                         value = upiId,
                                         onValueChange = { upiId = it.take(60) },
-                                        label = { Text("ASBA UPI Handle (Optional)") },
+                                        label = { Text(stringResource(R.string.upi_optional_label)) },
                                         singleLine = true,
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -413,7 +432,7 @@ fun AllotmentAndVaultScreen(
                                                 holderName.trim(),
                                                 panNumber.trim().uppercase(),
                                                 dematId.trim().ifBlank { "1208160000000001" },
-                                                upiId.trim().ifBlank { "investor@upi" },
+                                                upiId.trim(),
                                                 category
                                             )
                                         } else {
@@ -421,7 +440,7 @@ fun AllotmentAndVaultScreen(
                                                 holderName.trim(),
                                                 panNumber.trim().uppercase(),
                                                 dematId.trim().ifBlank { "1208160000000001" },
-                                                upiId.trim().ifBlank { "investor@upi" },
+                                                upiId.trim(),
                                                 category
                                             )
                                         }
@@ -516,7 +535,9 @@ fun AllotmentAndVaultScreen(
                                                 }
                                                 Spacer(modifier = Modifier.height(2.dp))
                                                 Text(
-                                                    text = "PAN: ${maskPanNumber(pan.panNumber, hidePanNumbers)} • UPI: ${pan.upiId.ifBlank { "investor@upi" }}",
+                                                    text = "PAN: ${maskPanNumber(pan.panNumber, hidePanNumbers)} • " +
+                                                        if (pan.upiId.isBlank()) stringResource(R.string.upi_not_set)
+                                                        else "UPI: ${maskUpiId(pan.upiId)}",
                                                     style = MaterialTheme.typography.labelMedium.copy(
                                                         fontFamily = FontFamily.Monospace,
                                                         fontWeight = FontWeight.Bold
@@ -641,6 +662,24 @@ fun AllotmentAndVaultScreen(
                             label = { Text("Active / Mandate Pending") }
                         )
                     }
+                    OutlinedTextField(
+                        value = allotmentSearch,
+                        onValueChange = { allotmentSearch = it.take(60) },
+                        placeholder = { Text(stringResource(R.string.allotment_search_hint)) },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        trailingIcon = {
+                            if (allotmentSearch.isNotEmpty()) {
+                                IconButton(onClick = { allotmentSearch = "" }) {
+                                    Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.allotment_search_clear))
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("allotment_search_input")
+                    )
                 }
             }
         }
@@ -684,7 +723,8 @@ fun AllotmentAndVaultScreen(
                                                 issuePrice = if (ipo.issuePrice > 0) ipo.issuePrice else 100,
                                                 lotSize = if (ipo.lotSize > 0) ipo.lotSize else 15,
                                                 boaDate = ipo.boaDate,
-                                                registrar = detectRegistrarForIpo(ipo.name, ipo.id)
+                                                registrar = resolveRegistrar(ipo.name, ipo.id, ipoExtras[ipo.id]),
+                                                registrarUrl = ipoExtras[ipo.id]?.registrarWebsite
                                             )
                                         }
                                         .testTag("quick_apply_ipo_chip_${ipo.id}")
@@ -1075,7 +1115,7 @@ fun AllotmentAndVaultScreen(
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
                                                 Text(
-                                                    text = "UPI: ${matchedApp.upiId.ifBlank { pan.upiId.ifBlank { "investor@upi" } }}",
+                                                    text = "UPI: ${maskUpiId(matchedApp.upiId.ifBlank { pan.upiId })}",
                                                     style = MaterialTheme.typography.labelSmall,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                                 )
@@ -1390,7 +1430,10 @@ fun AllotmentAndVaultScreen(
             },
             onDismiss = { activeMultiPanIpoCheck = null },
             hidePanNumbers = hidePanNumbers,
-            onToggleHidePanNumbers = onToggleHidePanNumbers
+            onToggleHidePanNumbers = onToggleHidePanNumbers,
+            onSaveAllotmentOutcome = onSaveAllotmentOutcome?.let { save ->
+                { target, outcome -> save(targetIpo, target, outcome) }
+            }
         )
     }
 
