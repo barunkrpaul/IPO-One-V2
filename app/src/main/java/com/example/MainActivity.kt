@@ -439,6 +439,17 @@ fun MainAppContent(
                 )
             },
             onAddPan = { showQuickAddPanModal = true },
+            onFamilyApplied = { pan, category, lots, upi ->
+                viewModel.submitIpoApplication(
+                    ipo = detailIpo,
+                    panHolderName = pan.holderName,
+                    panNumber = pan.panNumber,
+                    category = category,
+                    lotsApplied = lots,
+                    upiId = upi.takeIf { it.length >= 3 } ?: pan.upiId.takeIf { it.length >= 3 } ?: "not-set@upi",
+                    initialStatus = "Mandate Pending"
+                )
+            },
             onIntermediaryClick = { role, name ->
                 intermediaryFocus = role to name
                 showIntermediaries = true

@@ -129,7 +129,8 @@ fun IpoDetailScreen(
     onIntermediaryClick: ((IntermediaryRole, String) -> Unit)? = null,
     onSetPanBroker: ((panId: String, broker: String, clientId: String) -> Unit)? = null,
     onMarkApplied: ((pan: PanProfile, category: String, lots: Int) -> Unit)? = null,
-    onAddPan: () -> Unit = {}
+    onAddPan: () -> Unit = {},
+    onFamilyApplied: ((pan: PanProfile, category: String, lots: Int, upi: String) -> Unit)? = null
 ) {
     BackHandler(onBack = onBack)
     val context = LocalContext.current
@@ -142,6 +143,7 @@ fun IpoDetailScreen(
     }
     var showMyApplications by remember { mutableStateOf(false) }
     var showApplyAssistant by remember { mutableStateOf(false) }
+    var showFamilyApply by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -208,7 +210,20 @@ fun IpoDetailScreen(
             if (onMarkApplied != null && onSetPanBroker != null &&
                 (stage == IpoLifecycleStage.OPEN || stage == IpoLifecycleStage.UPCOMING)
             ) {
-                ApplyAssistantEntry(onClick = { showApplyAssistant = true })
+                if (onFamilyApplied != null) {
+                    ApplyAssistantEntry(
+                        title = stringResource(R.string.family_open),
+                        note = stringResource(R.string.family_open_note),
+                        tag = "detail_family_apply",
+                        onClick = { showFamilyApply = true }
+                    )
+                }
+                ApplyAssistantEntry(
+                    title = stringResource(R.string.apply_open),
+                    note = stringResource(R.string.apply_open_note),
+                    tag = "detail_apply_assistant",
+                    onClick = { showApplyAssistant = true }
+                )
             }
             TimelineCard(
                 entries = ipoTimeline(ipo, extras, today),
@@ -245,6 +260,18 @@ fun IpoDetailScreen(
                 modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
             )
         }
+    }
+
+    if (showFamilyApply && onFamilyApplied != null && onSetPanBroker != null) {
+        com.example.ui.components.FamilyApplySheet(
+            ipo = ipo,
+            panProfiles = panProfiles,
+            alreadyApplied = myApplications.map { it.panNumber.uppercase() }.toSet(),
+            hidePanNumbers = hidePanNumbers,
+            onSetBroker = onSetPanBroker,
+            onApplied = onFamilyApplied,
+            onDismiss = { showFamilyApply = false }
+        )
     }
 
     if (showApplyAssistant && onMarkApplied != null && onSetPanBroker != null) {
@@ -1020,12 +1047,12 @@ private fun MyApplicationsSheet(
 }
 
 @Composable
-private fun ApplyAssistantEntry(onClick: () -> Unit) {
+private fun ApplyAssistantEntry(title: String, note: String, tag: String, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .testTag("detail_apply_assistant"),
+            .testTag(tag),
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
     ) {
@@ -1035,12 +1062,12 @@ private fun ApplyAssistantEntry(onClick: () -> Unit) {
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = stringResource(R.string.apply_open),
+                    text = title,
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
                 Text(
-                    text = stringResource(R.string.apply_open_note),
+                    text = note,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                 )

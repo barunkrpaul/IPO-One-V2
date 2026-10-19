@@ -273,4 +273,26 @@
     <string name="apply_copy_all">Copy details</string>
     <string name="apply_pick_broker">Pick a broker</string>
     <string name="apply_mark_applied">I have applied · log it</string>
+
+    <!-- Family Apply -->
+    <string name="family_open">Family Apply · all PANs in one place</string>
+    <string name="family_open_note">Each member\'s broker opens inside IPO One with their own saved login</string>
+    <string name="family_title">Family Apply · %1$s</string>
+    <string name="family_subtitle_setup">Choose members, broker, lots and UPI ID</string>
+    <string name="family_subtitle_running">Member %1$d of %2$d</string>
+    <string name="family_subtitle_done">Done. Approve each UPI mandate.</string>
+    <string name="family_how_it_works">Set up once: pick each member\'s broker and log in to it the first time; that login is kept for that member on this phone (encrypted) until the broker ends it. The app fills lots, cut-off price and UPI ID. You review and tap the broker\'s Apply button, and the app logs it and moves to the next member. Each member then approves the UPI mandate in their UPI app.</string>
+    <string name="family_login_saved">Login saved</string>
+    <string name="family_upi_label">UPI ID for this bid</string>
+    <string name="family_start">Start (%1$d members)</string>
+    <string name="family_current">%1$s (%2$s) · %3$s · %4$d lot(s)</string>
+    <string name="family_status_login">Log in if asked (first time or after the broker logs out), then open this IPO.</string>
+    <string name="family_status_filling">Opening this IPO\'s bid form…</string>
+    <string name="family_status_confirm">Bid filled in. Check it and tap Apply on the broker page.</string>
+    <string name="family_status_done">Bid placed. Logged in your applications.</string>
+    <string name="family_fill_again">Fill again</string>
+    <string name="family_mark_applied">Bid placed · next</string>
+    <string name="family_outcome_applied">Applied</string>
+    <string name="family_outcome_skipped">Skipped</string>
+    <string name="family_mandate_reminder">Each applied member gets a UPI mandate request in their UPI app. It must be approved before 5 PM on the closing day, or the bid is not valid.</string>
 </resources>
