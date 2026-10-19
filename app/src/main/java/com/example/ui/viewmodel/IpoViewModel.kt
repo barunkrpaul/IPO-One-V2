@@ -462,6 +462,32 @@ class IpoViewModel(
         bulkSyncJob?.cancel()
     }
 
+    private var autoRefreshJob: Job? = null
+
+    /** Refreshes the live feed every [minutes] while the app is open; 0 turns it off. */
+    fun setAutoRefreshMinutes(minutes: Int) {
+        autoRefreshJob?.cancel()
+        if (minutes <= 0) return
+        autoRefreshJob = viewModelScope.launch {
+            while (true) {
+                delay(minutes * 60_000L)
+                refreshLiveInvestorGainData()
+            }
+        }
+    }
+
+    /** Drops downloaded IPO page details, then reads the live IPOs' pages again. */
+    fun clearCache(onCleared: () -> Unit = {}) {
+        viewModelScope.launch {
+            bulkSyncJob?.cancel()
+            pageDetailsCache?.clear()
+            _pageDetails.value = emptyMap()
+            _pageDetailsSync.value = PageDetailsSyncState()
+            (_liveIposState.value as? UiState.Success)?.data?.let { refreshLivePageDetails(it) }
+            onCleared()
+        }
+    }
+
     fun setListedYearFilter(year: Int?) {
         _listedYearFilter.value = year
         _listedVisibleCount.value = LISTED_PAGE_SIZE

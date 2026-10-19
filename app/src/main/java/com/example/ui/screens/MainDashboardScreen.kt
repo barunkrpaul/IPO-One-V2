@@ -6,7 +6,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -139,7 +141,8 @@ fun MainDashboardScreen(
     onOpenIpoById: ((String) -> Unit)? = null,
     listedHistory: ListedHistoryView = ListedHistoryView(isLoading = false),
     onListedYearChange: (Int?) -> Unit = {},
-    onLoadMoreListed: () -> Unit = {}
+    onLoadMoreListed: () -> Unit = {},
+    onOpenGlobalSearch: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     var sortMenuExpanded by remember { mutableStateOf(false) }
@@ -390,7 +393,16 @@ fun MainDashboardScreen(
                     onValueChange = onSearchQueryChange,
                     placeholder = { Text("Search IPO or sector...") },
                     leadingIcon = {
-                        Icon(Icons.Default.Search, contentDescription = "Search")
+                        // Long-press the search icon for search across everything
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription = "Search",
+                            modifier = Modifier
+                                .pointerInput(onOpenGlobalSearch) {
+                                    detectTapGestures(onLongPress = { onOpenGlobalSearch?.invoke() })
+                                }
+                                .testTag("dashboard_search_icon")
+                        )
                     },
                     trailingIcon = {
                         if (searchQuery.isNotEmpty()) {

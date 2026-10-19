@@ -1,5 +1,8 @@
 package com.example.ui.theme
 
+import androidx.compose.foundation.isSystemInDarkTheme
+import com.example.data.local.ThemeMode
+
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -136,12 +139,28 @@ val AppTypography = Typography(
     )
 )
 
+// Pure black for OLED screens; cards keep a slight lift so they stay distinguishable
+private val BlackColorPalette = DarkColorPalette.copy(
+    background = Color.Black,
+    surface = Color(0xFF0A0A0A),
+    surfaceVariant = Color(0xFF161616),
+    outline = Color(0xFF2A2A2A)
+)
+
+/** [themeMode] (from Settings) takes precedence over [darkTheme] when given. */
 @Composable
 fun IpoOneTheme(
     darkTheme: Boolean = true,
+    themeMode: ThemeMode? = null,
     content: @Composable () -> Unit
 ) {
-    val colors = if (darkTheme) DarkColorPalette else LightColorPalette
+    val colors = when (themeMode) {
+        ThemeMode.SYSTEM -> if (isSystemInDarkTheme()) DarkColorPalette else LightColorPalette
+        ThemeMode.LIGHT -> LightColorPalette
+        ThemeMode.DARK -> DarkColorPalette
+        ThemeMode.BLACK -> BlackColorPalette
+        null -> if (darkTheme) DarkColorPalette else LightColorPalette
+    }
     MaterialTheme(
         colorScheme = colors,
         typography = AppTypography,

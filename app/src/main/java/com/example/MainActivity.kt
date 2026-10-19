@@ -25,6 +25,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import kotlinx.coroutines.launch
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material.icons.filled.Fingerprint
@@ -96,6 +99,11 @@ import com.example.data.local.IpoPageDetailsCache
 import com.example.data.model.IntermediaryRole
 import com.example.data.model.IpoLifecycleStage
 import com.example.data.model.lifecycleStage
+import com.example.data.local.AppSettings
+import com.example.data.local.AppSettingsStore
+import com.example.notifications.IpoReminderWorker
+import com.example.ui.screens.AppSettingsScreen
+import com.example.ui.screens.GlobalSearchScreen
 import com.example.ui.screens.IntermediariesScreen
 import com.example.ui.screens.IpoCalendarScreen
 import com.example.ui.screens.IpoDetailScreen
@@ -124,8 +132,10 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val settingsStore = AppSettingsStore(this)
         setContent {
-            IpoOneTheme {
+            val settings by settingsStore.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
+            IpoOneTheme(themeMode = settings.themeMode) {
                 AppRootNavigation()
             }
         }
@@ -215,6 +225,9 @@ fun MainAppContent(
     val listedHistory by viewModel.listedHistoryView.collectAsStateWithLifecycle()
     val intermediaryDirectory by viewModel.intermediaryDirectoryState.collectAsStateWithLifecycle()
     val pageDetailsSync by viewModel.pageDetailsSync.collectAsStateWithLifecycle()
+    val listedHistoryState by viewModel.listedHistoryState.collectAsStateWithLifecycle()
+    val settingsStore = remember { AppSettingsStore(context) }
+    val appSettings by settingsStore.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
     val todayEvents = remember(calendarEvents) { eventsOn(calendarEvents, java.time.LocalDate.now()) }
 
     val userProfile = (userProfileState as? UiState.Success)?.data
@@ -224,6 +237,12 @@ fun MainAppContent(
     val panList = (panProfilesState as? UiState.Success)?.data ?: emptyList()
     val appList = (applicationsState as? UiState.Success)?.data ?: emptyList()
 
+    LaunchedEffect(watchedIds, appList, isGuestMode) {
+        if (!isGuestMode) {
+            AppSettingsStore(context).setTrackedIpoIds(watchedIds + appList.map { it.ipoId }.filter { it.isNotBlank() })
+        }
+    }
+
     var currentTab by rememberSaveable { mutableIntStateOf(0) }
     var selectedIpo by remember { mutableStateOf<LiveIpoItem?>(null) }
     // Tab indices: 0 dashboard, 1 allotment & vault, 2 security, 3 calendar
@@ -231,6 +250,28 @@ fun MainAppContent(
     var showIntermediaries by rememberSaveable { mutableStateOf(false) }
     var intermediaryFocus by remember { mutableStateOf<Pair<IntermediaryRole, String>?>(null) }
     var overflowMenuOpen by remember { mutableStateOf(false) }
+    var showGlobalSearch by rememberSaveable { mutableStateOf(false) }
+    var showSecuritySettings by rememberSaveable { mutableStateOf(false) }
+    var defaultBoardApplied by rememberSaveable { mutableStateOf(false) }
+
+    // Launch board from Settings, applied once per session
+    LaunchedEffect(Unit) {
+        if (!defaultBoardApplied) {
+            viewModel.setBoardFilter(settingsStore.current().defaultBoard)
+            defaultBoardApplied = true
+        }
+    }
+    LaunchedEffect(appSettings.refreshIntervalMinutes) {
+        viewModel.setAutoRefreshMinutes(appSettings.refreshIntervalMinutes)
+    }
+    // Reminders need sign-in; the worker reads which IPOs to watch from the settings store
+    LaunchedEffect(isGuestMode, appSettings.notifications) {
+        if (!isGuestMode && appSettings.notifications.anyEnabled) {
+            IpoReminderWorker.schedule(context)
+        } else {
+            IpoReminderWorker.cancel(context)
+        }
+    }
     val openIpoById: (String) -> Unit = { id ->
         (allIposState as? UiState.Success)?.data?.firstOrNull { it.id == id }?.let { selectedIpo = it }
     }
@@ -397,6 +438,33 @@ fun MainAppContent(
                 }
             }
         )
+    } else if (showGlobalSearch) {
+        GlobalSearchScreen(
+            live = (allIposState as? UiState.Success)?.data.orEmpty(),
+            history = (listedHistoryState as? UiState.Success)?.data.orEmpty(),
+            directory = intermediaryDirectory,
+            applications = appList,
+            extras = ipoExtras,
+            onBack = { showGlobalSearch = false },
+            onOpenIpo = { selectedIpo = it },
+            onOpenListed = { record ->
+                if (record.url.isNotBlank()) {
+                    runCatching {
+                        context.startActivity(
+                            android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(record.url))
+                        )
+                    }
+                }
+            },
+            onOpenIntermediary = { entry ->
+                intermediaryFocus = entry.role to entry.name
+                showIntermediaries = true
+            },
+            onOpenApplication = {
+                showGlobalSearch = false
+                currentTab = 1
+            }
+        )
     } else Scaffold(
         contentWindowInsets = WindowInsets.safeDrawing,
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -412,6 +480,14 @@ fun MainAppContent(
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = { showGlobalSearch = true },
+                        modifier = Modifier
+                            .size(36.dp)
+                            .testTag("top_global_search")
+                    ) {
+                        Icon(Icons.Default.Search, contentDescription = stringResource(R.string.search_open))
+                    }
                     Box {
                         IconButton(
                             onClick = { overflowMenuOpen = true },
@@ -528,8 +604,8 @@ fun MainAppContent(
                 NavigationBarItem(
                     selected = currentTab == 2,
                     onClick = { currentTab = 2 },
-                    icon = { Icon(Icons.Default.Security, contentDescription = "Security Settings") },
-                    label = { Text("Security") },
+                    icon = { Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.nav_settings)) },
+                    label = { Text(stringResource(R.string.nav_settings)) },
                     modifier = Modifier.testTag("nav_security_settings")
                 )
             }
@@ -581,7 +657,8 @@ fun MainAppContent(
                     onOpenIpoById = openIpoById,
                     listedHistory = listedHistory,
                     onListedYearChange = viewModel::setListedYearFilter,
-                    onLoadMoreListed = viewModel::loadMoreListed
+                    onLoadMoreListed = viewModel::loadMoreListed,
+                    onOpenGlobalSearch = { showGlobalSearch = true }
                 )
 
                 3 -> IpoCalendarScreen(
@@ -673,9 +750,33 @@ fun MainAppContent(
                     )
                 }
 
-                2 -> if (isGuestMode) {
+                2 -> if (!showSecuritySettings) {
+                    AppSettingsScreen(
+                        settings = appSettings,
+                        isGuest = isGuestMode,
+                        onThemeChange = { mode -> scope.launch { settingsStore.setThemeMode(mode) } },
+                        onDefaultBoardChange = { board ->
+                            scope.launch { settingsStore.setDefaultBoard(board) }
+                        },
+                        onRefreshIntervalChange = { minutes -> scope.launch { settingsStore.setRefreshInterval(minutes) } },
+                        onNotificationsChange = { prefs -> scope.launch { settingsStore.setNotifications(prefs) } },
+                        onClearCache = {
+                            viewModel.clearCache {
+                                coil.Coil.imageLoader(context).memoryCache?.clear()
+                                runCatching { java.io.File(context.cacheDir, "image_cache").deleteRecursively() }
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(context.getString(R.string.settings_cache_cleared))
+                                }
+                            }
+                        },
+                        onOpenSecurity = { showSecuritySettings = true },
+                        onSignInRequested = onSignInRequested
+                    )
+                } else if (isGuestMode) {
+                    BackHandler { showSecuritySettings = false }
                     GuestSecurityPlaceholder(onSignInRequested = onSignInRequested)
                 } else {
+                    BackHandler { showSecuritySettings = false }
                     SecuritySettingsScreen(
                         userProfile = userProfile,
                         userEmail = currentUser?.email,

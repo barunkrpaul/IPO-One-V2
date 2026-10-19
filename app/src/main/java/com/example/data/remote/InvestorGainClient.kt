@@ -326,6 +326,23 @@ class InvestorGainClient(
         }
     }
 
+    /** True once the IPO page reports the basis of allotment as finalised. */
+    suspend fun isAllotmentFinalized(pageUrl: String): Result<Boolean> = withContext(Dispatchers.IO) {
+        runCatching {
+            val req = Request.Builder()
+                .url(pageUrl)
+                .header("User-Agent", USER_AGENT)
+                .header("Accept", "text/html")
+                .build()
+            val html = httpClient.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) throw java.io.IOException("HTTP ${resp.code} for $pageUrl")
+                resp.body?.string().orEmpty()
+            }
+            val flag = IpoPageParser.extractValue(IpoPageParser.unescape(html), "boa_finalized")?.lowercase()
+            flag == "1" || flag == "true" || flag == "y" || flag == "yes"
+        }
+    }
+
     private fun JSONObject.optNumberOrNull(key: String): Double? =
         if (isNull(key)) null else opt(key)?.toString()?.trim()?.toDoubleOrNull()
 
