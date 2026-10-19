@@ -5,25 +5,25 @@ on:
 jobs:
   probe:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-java@v5
-        with: { java-version: '17', distribution: 'temurin' }
-      - name: run parser
+      - name: registrars
         run: |
           UA="Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/129 Mobile Safari/537.36"
-          curl -sSL -o kc.zip https://github.com/JetBrains/kotlin/releases/download/v2.2.10/kotlin-compiler-2.2.10.zip && unzip -q kc.zip
-          curl -sSL -o json.jar https://repo1.maven.org/maven2/org/json/json/20240303/json-20240303.jar
-          curl -sS -A "$UA" "https://www.investorgain.com/gmp/tonbo-imaging-india-ipo/2369/" > tonbo.html
-          curl -sS -A "$UA" "https://www.investorgain.com/gmp/acme-india-industries-ipo/2006/" > acme.html
-          curl -sS -A "$UA" "https://www.investorgain.com/gmp/bls-polymers-ipo/1849/" > bls.html
-          kotlinc/bin/kotlinc -nowarn -cp json.jar probe/*.kt -d out
-          java -cp out:json.jar:kotlinc/lib/kotlin-stdlib.jar MainKt tonbo.html acme.html bls.html
-          python3 -c "
-          import re
-          for f in ['tonbo.html','acme.html']:
-              h=open(f).read().replace('\\\\\"','\"')
-              for k in ['floor_price','cap_price','issue_price']:
-                  print('::notice::'+f+' '+k+' '+' || '.join(h[m.start():m.start()+40] for m in list(re.finditer(k,h))[:4]))
-          "
+          i=0
+          for u in https://kosmic.kfintech.com/ipostatus/ https://ipostatus.kfintech.com/ https://in.mpms.mufg.com/Initial_Offer/public-issues.html https://ipo.bigshareonline.com/IPO_Status.html https://ipo.cameoindia.com/ https://www.skylinerta.com/ipo.php https://maashitla.com/allotment-status/public-issues https://www.purvashare.com/investor-service/ipo-query https://ipostatus.integratedregistry.in/ https://www.masserv.com/opt.asp; do
+            i=$((i+1)); code=$(curl -sSL -m 20 -A "$UA" -o r$i.html -w "%{http_code} %{url_effective}" "$u" 2>&1); echo "$u -> $code" > r$i.meta
+          done
+          python3 - <<'PY'
+          import re,glob
+          for f in sorted(glob.glob("r*.html"), key=lambda x:int(x[1:-5])):
+              meta=open(f.replace(".html",".meta")).read().strip()
+              h=open(f,errors="ignore").read()
+              sel=re.findall(r'<select[^>]*>',h,re.I)[:3]
+              inp=[m for m in re.findall(r'<input[^>]*>',h,re.I) if 'hidden' not in m.lower()][:10]
+              btn=re.findall(r'<button[^>]*>[^<]{0,30}',h,re.I)[:4]
+              cap=[k for k in ['captcha','recaptcha','hcaptcha','g-recaptcha'] if k in h.lower()]
+              scripts=re.findall(r'<script[^>]+src="([^"]+)"',h,re.I)[:4]
+              msg="%s len=%d captcha=%s selects=%s inputs=%s buttons=%s scripts=%s"%(meta,len(h),cap,sel,inp,btn,scripts)
+              print("::notice::"+msg.replace("\n"," ")[:3900])
+          PY
