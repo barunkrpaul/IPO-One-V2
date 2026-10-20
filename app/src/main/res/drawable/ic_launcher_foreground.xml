@@ -1,39 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- A single rounded rising arrow with an amber spark, kept inside the 66dp safe zone -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Outer subtle glow ring inside 66dp safe zone -->
     <path
-        android:fillColor="#1A00E676"
-        android:pathData="M54,24A30,30 0,1 1,24 54A30,30 0,0 1,54 24z" />
-    <!-- Bullish Candlestick 1 -->
+        android:pathData="M54,35 L66,48.5 L57.5,48.5 L57.5,72 L50.5,72 L50.5,48.5 L42,48.5 Z"
+        android:strokeWidth="5"
+        android:strokeLineJoin="round">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="54"
+                android:startY="32"
+                android:endX="54"
+                android:endY="75"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#6EE7B7" />
+                <item android:offset="1.0" android:color="#10B981" />
+            </gradient>
+        </aapt:attr>
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="54"
+                android:startY="32"
+                android:endX="54"
+                android:endY="75"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#6EE7B7" />
+                <item android:offset="1.0" android:color="#10B981" />
+            </gradient>
+        </aapt:attr>
+    </path>
     <path
-        android:fillColor="#00E676"
-        android:pathData="M35,56h6v14h-6z" />
-    <path
-        android:fillColor="#00E676"
-        android:pathData="M37,50h2v24h-2z" />
-    <!-- Bullish Candlestick 2 -->
-    <path
-        android:fillColor="#00E676"
-        android:pathData="M47,44h6v18h-6z" />
-    <path
-        android:fillColor="#00E676"
-        android:pathData="M49,38h2v28h-2z" />
-    <!-- Gold Peak Candlestick 3 ('1' Monogram Pillar) -->
-    <path
-        android:fillColor="#FFD54F"
-        android:pathData="M59,32h8v38h-8z" />
-    <path
-        android:fillColor="#FFD54F"
-        android:pathData="M62,26h2v46h-2z" />
-    <!-- Upward Arrow Trend Line -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M32,64 L48,48 L56,53 L72,33 L76,36 L56,60 L48,55 L35,68 Z" />
-    <path
-        android:fillColor="#FFD54F"
-        android:pathData="M65,31 L77,31 L77,43 Z" />
+        android:fillColor="#FBBF24"
+        android:pathData="M68.5,33a3.75,3.75 0,1 1,0 7.5a3.75,3.75 0,1 1,0 -7.5z" />
 </vector>

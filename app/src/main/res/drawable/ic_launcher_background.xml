@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Deep ink fading into dark jade, matching the app's Ink & Jade theme -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
@@ -8,14 +9,13 @@
     <path android:pathData="M0,0h108v108h-108z">
         <aapt:attr name="android:fillColor">
             <gradient
-                android:startX="0"
+                android:startX="18"
                 android:startY="0"
-                android:endX="108"
+                android:endX="90"
                 android:endY="108"
                 android:type="linear">
-                <item android:offset="0.0" android:color="#071126" />
-                <item android:offset="0.55" android:color="#0D1F40" />
-                <item android:offset="1.0" android:color="#062B29" />
+                <item android:offset="0.0" android:color="#0B1424" />
+                <item android:offset="1.0" android:color="#0B3A30" />
             </gradient>
         </aapt:attr>
     </path>

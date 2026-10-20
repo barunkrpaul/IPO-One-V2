@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Monochrome notification icon: a rising line on a bar chart -->
+<!-- Monochrome notification icon: the launcher's rising arrow and spark -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
@@ -7,5 +7,11 @@
     android:viewportHeight="24">
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M3.5,18.49l6,-6.01 4,4L22,6.92l-1.41,-1.41 -7.09,7.97 -4,-4L2,16.99z" />
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineJoin="round"
+        android:pathData="M12,4 L17.5,10 L14,10 L14,20 L10,20 L10,10 L6.5,10 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M19.5,3.5a1.75,1.75 0,1 1,0 3.5a1.75,1.75 0,1 1,0 -3.5z" />
 </vector>
