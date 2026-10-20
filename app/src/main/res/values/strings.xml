@@ -295,7 +295,6 @@
     <string name="family_outcome_applied">Applied</string>
     <string name="family_outcome_skipped">Skipped</string>
     <string name="family_mandate_reminder">Each applied member gets a UPI mandate request in their UPI app. It must be approved before 5 PM on the closing day, or the bid is not valid.</string>
-    <string name="gmp_table_title">Live IPOs</string>
     <string name="gmp_table_refresh">Refresh</string>
     <string name="gmp_table_detailed_view">Detailed view</string>
     <string name="gmp_table_simple_view">Simple view</string>
@@ -308,9 +307,14 @@
     <string name="gmp_table_gmp_percent">GMP %1$s</string>
     <string name="gmp_table_stage_open">Open now</string>
     <string name="gmp_table_stage_upcoming">Upcoming</string>
-    <string name="gmp_table_stage_closed">Closed · allotment due</string>
-    <string name="gmp_table_stage_allotted">Allotted · listing due</string>
     <string name="gmp_table_empty">No current IPOs on this board.</string>
     <string name="gmp_table_error">Could not load IPO data.</string>
     <string name="gmp_table_retry">Retry</string>
+    <string name="menu_sign_in">Sign in</string>
+    <string name="menu_add_pan">Add PAN</string>
+    <string name="menu_pans_count">Manage PANs (%1$d)</string>
+    <string name="menu_hide_pan">Hide PAN numbers</string>
+    <string name="menu_show_pan">Show PAN numbers</string>
+    <string name="gmp_table_section_closed">Closed · allotment due</string>
+    <string name="gmp_table_section_allotted">Allotted · listing due</string>
 </resources>

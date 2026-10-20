@@ -86,6 +86,7 @@ import com.example.ui.auth.AuthScreen
 import com.example.ui.auth.signOutUser
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.IconButton
@@ -515,29 +516,23 @@ fun MainAppContent(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "IPO One",
-                            style = MaterialTheme.typography.headlineMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
+                    Text(
+                        text = "IPO One",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
                 },
                 actions = {
                     IconButton(
                         onClick = { showGlobalSearch = true },
-                        modifier = Modifier
-                            .size(36.dp)
-                            .testTag("top_global_search")
+                        modifier = Modifier.testTag("top_global_search")
                     ) {
                         Icon(Icons.Default.Search, contentDescription = stringResource(R.string.search_open))
                     }
                     Box {
                         IconButton(
                             onClick = { overflowMenuOpen = true },
-                            modifier = Modifier
-                                .size(36.dp)
-                                .testTag("top_overflow_menu")
+                            modifier = Modifier.testTag("top_overflow_menu")
                         ) {
                             Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.menu_more))
                         }
@@ -545,8 +540,55 @@ fun MainAppContent(
                             expanded = overflowMenuOpen,
                             onDismissRequest = { overflowMenuOpen = false }
                         ) {
+                            if (isGuestMode) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.menu_sign_in)) },
+                                    leadingIcon = { Icon(Icons.Default.VerifiedUser, contentDescription = null) },
+                                    onClick = {
+                                        overflowMenuOpen = false
+                                        onSignInRequested()
+                                    },
+                                    modifier = Modifier.testTag("top_sign_in_button")
+                                )
+                            }
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        if (panList.isEmpty()) stringResource(R.string.menu_add_pan)
+                                        else stringResource(R.string.menu_pans_count, panList.size)
+                                    )
+                                },
+                                leadingIcon = { Icon(Icons.Default.Add, contentDescription = null) },
+                                onClick = {
+                                    overflowMenuOpen = false
+                                    showQuickAddPanModal = true
+                                },
+                                modifier = Modifier.testTag("top_add_pan_button")
+                            )
+                            if (panList.isNotEmpty()) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            if (hidePanNumbers) stringResource(R.string.menu_show_pan)
+                                            else stringResource(R.string.menu_hide_pan)
+                                        )
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            if (hidePanNumbers) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                            contentDescription = null
+                                        )
+                                    },
+                                    onClick = {
+                                        overflowMenuOpen = false
+                                        viewModel.toggleHidePanNumbers()
+                                    },
+                                    modifier = Modifier.testTag("top_toggle_hide_pan_button")
+                                )
+                            }
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.menu_intermediaries)) },
+                                leadingIcon = { Icon(Icons.Default.AccountBalance, contentDescription = null) },
                                 onClick = {
                                     overflowMenuOpen = false
                                     intermediaryFocus = null
@@ -554,64 +596,6 @@ fun MainAppContent(
                                 },
                                 modifier = Modifier.testTag("menu_intermediaries")
                             )
-                        }
-                    }
-                    if (panList.isNotEmpty()) {
-                        IconButton(
-                            onClick = { viewModel.toggleHidePanNumbers() },
-                            modifier = Modifier
-                                .size(36.dp)
-                                .testTag("top_toggle_hide_pan_button")
-                        ) {
-                            Icon(
-                                imageVector = if (hidePanNumbers) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                contentDescription = if (hidePanNumbers) "Show PAN Numbers" else "Hide PAN Numbers",
-                                tint = if (hidePanNumbers) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-
-                    OutlinedButton(
-                        onClick = { showQuickAddPanModal = true },
-                        modifier = Modifier
-                            .padding(end = 8.dp)
-                            .height(36.dp)
-                            .testTag("top_add_pan_button"),
-                        shape = RoundedCornerShape(10.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(15.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = if (panList.isEmpty()) "Add PAN" else "PANs (${panList.size})",
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
-                        )
-                    }
-
-                    if (isGuestMode) {
-                        Button(
-                            onClick = onSignInRequested,
-                            modifier = Modifier
-                                .padding(end = 8.dp)
-                                .height(36.dp)
-                                .testTag("top_sign_in_button"),
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary
-                            )
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.VerifiedUser,
-                                contentDescription = null,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Sign In", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
                         }
                     }
                 },
