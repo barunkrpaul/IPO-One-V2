@@ -39,7 +39,9 @@ android {
                 storeFile = releaseKeystore
                 storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD")
                 keyAlias = System.getenv("RELEASE_KEY_ALIAS")
-                keyPassword = System.getenv("RELEASE_KEY_PASSWORD") ?: System.getenv("RELEASE_KEYSTORE_PASSWORD")
+                // Unset GitHub secrets arrive as empty strings, so treat blank as "not given"
+                keyPassword = System.getenv("RELEASE_KEY_PASSWORD")?.takeIf { it.isNotBlank() }
+                    ?: System.getenv("RELEASE_KEYSTORE_PASSWORD")
             }
         }
     }
