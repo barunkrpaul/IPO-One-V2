@@ -52,6 +52,16 @@ jobs:
             echo "::warning::No RELEASE_KEYSTORE_B64 secret; the release APK uses the debug key."
           fi
 
+      - name: Show release certificate fingerprints
+        if: env.RELEASE_KEYSTORE_PATH != ''
+        env:
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+        run: |
+          # Public fingerprints to register in Firebase (needed for Google Sign-In)
+          keytool -list -v -keystore "$RELEASE_KEYSTORE_PATH" -alias "$RELEASE_KEY_ALIAS" -storepass "$RELEASE_KEYSTORE_PASSWORD" \
+            | grep -E "SHA1:|SHA256:" | sed 's/^[[:space:]]*/::notice::/'
+
       - name: Build Signed APKs
         env:
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
