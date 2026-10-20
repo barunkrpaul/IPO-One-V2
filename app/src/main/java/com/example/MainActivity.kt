@@ -59,6 +59,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -262,6 +263,7 @@ fun MainAppContent(
     }
 
     var currentTab by rememberSaveable { mutableIntStateOf(0) }
+    var simpleGmpView by rememberSaveable { mutableStateOf(true) }
     var selectedIpo by remember { mutableStateOf<LiveIpoItem?>(null) }
     // Tab indices: 0 dashboard, 1 allotment & vault, 2 security, 3 calendar
     var calendarFocusDate by remember { mutableStateOf<java.time.LocalDate?>(null) }
@@ -659,7 +661,21 @@ fun MainAppContent(
                 .padding(innerPadding)
         ) {
             when (currentTab) {
-                0 -> MainDashboardScreen(
+                0 -> if (simpleGmpView) {
+                    com.example.ui.screens.GmpTableScreen(
+                        allIposState = allIposState,
+                        boardFilter = boardFilter,
+                        onBoardFilterChange = viewModel::setBoardFilter,
+                        onRefresh = viewModel::refreshLiveInvestorGainData,
+                        onSelectIpo = { selectedIpo = it },
+                        onShowDetailedView = { simpleGmpView = false }
+                    )
+                } else Column(modifier = Modifier.fillMaxSize()) {
+                    TextButton(
+                        onClick = { simpleGmpView = true },
+                        modifier = Modifier.padding(start = 8.dp).testTag("gmp_simple_toggle")
+                    ) { Text(stringResource(R.string.gmp_table_simple_view)) }
+                    MainDashboardScreen(
                     allIposState = allIposState,
                     filteredIposState = filteredIposState,
                     statusFilter = statusFilter,
@@ -701,7 +717,8 @@ fun MainAppContent(
                     onListedYearChange = viewModel::setListedYearFilter,
                     onLoadMoreListed = viewModel::loadMoreListed,
                     onOpenGlobalSearch = { showGlobalSearch = true }
-                )
+                    )
+                }
 
                 3 -> IpoCalendarScreen(
                     liveIposState = allIposState,
